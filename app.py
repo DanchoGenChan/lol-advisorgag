@@ -170,7 +170,7 @@ if len(st.session_state.history) > 0:
 {last['outputs'][1]}
 {last['outputs'][2]}
 
-#LOL #ちくちく #コーチング
+#LOL #LeagueOfLegends #ちくちく #コーチング
 
 👇自己責任でどうぞ
 {url_link}
