@@ -89,6 +89,8 @@ if "event" not in st.session_state:
     st.session_state.event = None
 if "history" not in st.session_state:
     st.session_state.history = []
+if "frames" not in st.session_state:
+    st.session_state.frames = []
 
 total = len(st.session_state.history)
 
@@ -155,6 +157,7 @@ if st.button("🔥 着火　🔥", key="start_button"):
             trim_video("input.mp4", start_time, end_time, "clip.mp4")
 
             frames = extract_frames("clip.mp4")
+            st.session_state.frames = frames
 
             st.write(f"抽出フレーム数: {len(frames)}")
 
@@ -200,12 +203,22 @@ if st.button("🔥 着火　🔥", key="start_button"):
 if len(st.session_state.history) > 0:
 
     last = st.session_state.history[-1]
+    frames = st.session_state.frames
 
     st.subheader("🔥ちくちく一言🔥")
 
     for i, text in enumerate(last["outputs"]):
 
-        st.success(f"{text}")
+        col_img, col_text = st.columns([1, 2])
+
+        with col_img:
+            if i < len(frames):
+                st.image(frames[i], use_container_width=True)
+
+        with col_text:
+            st.success(text)
+
+
 
         col1, col2 = st.columns(2)
 
