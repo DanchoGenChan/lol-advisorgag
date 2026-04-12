@@ -49,6 +49,11 @@ def extract_frames(video_path, output_dir="frames", interval=3):
     cap.release()
     return saved
 
+# 修正①
+with open("input.mp4", "wb") as f:
+    f.write(video_file.getvalue())
+
+# 修正②
 def trim_video(input_path, start, end, output_path):
     command = [
         "ffmpeg",
@@ -59,7 +64,11 @@ def trim_video(input_path, start, end, output_path):
         "-c", "copy",
         output_path
     ]
-    subprocess.run(command)
+    try:
+        subprocess.run(command, check=True)
+    except:
+        st.error("動画処理に失敗（ffmpeg未対応の可能性）")
+        return
 
 def analyze_frames_with_gpt(frame_paths, client):
     descriptions = []
