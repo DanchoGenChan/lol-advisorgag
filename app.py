@@ -119,7 +119,7 @@ if len(st.session_state.history) > 0:
         # 👍
         with col1:
             if st.button(
-                f"👍",
+                f"いいちくちく👍",
                 key=f"good_{len(st.session_state.history)}_{i}"
             ):
                 if last.get("ratings") is None:
@@ -130,7 +130,7 @@ if len(st.session_state.history) > 0:
         # 👎
         with col2:
             if st.button(
-                f"👎",
+                f"よくないちくちく👎",
                 key=f"bad_{len(st.session_state.history)}_{i}"
             ):
                 if last.get("ratings") is None:
