@@ -171,7 +171,10 @@ if st.button("🔥 着火　🔥", key="start_button"):
                             lane,
                             f"{start_time}〜{end_time}",
                             st.session_state.event
-                        ) + f"\n\n【参考情報（動画分析）】\n{vision_context}"
+                        ) + f"""【重要：以下は実際の画面分析】
+                                   {vision_context}
+                             この情報を必ず使って具体的に指摘、改善案の提示をしろ
+                             """
                     }
                 ]
             )
