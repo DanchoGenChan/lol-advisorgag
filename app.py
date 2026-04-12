@@ -120,10 +120,6 @@ lane = st.selectbox(
     key="lane_select"
 )
 
-time = st.text_input(
-    "時間（例: 8:30）",
-    key="time_input"
-)
 
 # =========================
 # イベント選択
@@ -173,7 +169,7 @@ if st.button("🔥 着火　🔥", key="start_button"):
                         "role": "user",
                         "content": build_prompt(
                             lane,
-                            time,
+                            f"{start_time}〜{end_time}",
                             st.session_state.event
                         ) + f"\n\n【参考情報（動画分析）】\n{vision_context}"
                     }
