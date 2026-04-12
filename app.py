@@ -6,6 +6,7 @@ import urllib.parse
 import subprocess
 import cv2
 import os
+import base64  # 👈 追加
 
 def extract_frames(video_path, output_dir="frames", interval=3):
     os.makedirs(output_dir, exist_ok=True)
@@ -29,7 +30,6 @@ def extract_frames(video_path, output_dir="frames", interval=3):
 
             path = f"{output_dir}/frame_{count}_{timestamp}.jpg"
 
-            # 👇 フレームに時間を描画
             cv2.putText(
                 frame,
                 f"{timestamp}",
@@ -48,6 +48,7 @@ def extract_frames(video_path, output_dir="frames", interval=3):
 
     cap.release()
     return saved
+
 def trim_video(input_path, start, end, output_path):
     command = [
         "ffmpeg",
@@ -63,9 +64,11 @@ def trim_video(input_path, start, end, output_path):
 def analyze_frames_with_gpt(frame_paths, client):
     descriptions = []
 
-    for path in frame_paths[:3]:  # 最大3枚で軽量化
+    for path in frame_paths[:3]:
         with open(path, "rb") as f:
             img_bytes = f.read()
+
+        img_base64 = base64.b64encode(img_bytes).decode()  # 👈 修正
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -74,7 +77,7 @@ def analyze_frames_with_gpt(frame_paths, client):
                     "role": "user",
                     "content": [
                         {"type": "text", "text": "LoLの試合画面。この状況を具体的に説明しろ（HP状況・位置・人数差・危険度）"},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_bytes.hex()}"}}
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"}}
                     ]
                 }
             ]
@@ -89,7 +92,6 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 st.set_page_config(page_title="LOLコーチング", layout="centered")
 st.title("🔥 ちくちくコーチングAI 🔥")
 
-# セッション状態
 if "event" not in st.session_state:
     st.session_state.event = None
 if "history" not in st.session_state:
@@ -107,18 +109,6 @@ video_file = st.file_uploader(
 )
 if video_file:
     st.video(video_file)
-
-# 👇ここに追加
-if video_file and start_time and end_time:
-
-    with open("input.mp4", "wb") as f:
-        f.write(video_file.read())
-
-    trim_video("input.mp4", start_time, end_time, "clip.mp4")
-
-    frames = extract_frames("clip.mp4")
-
-    st.write(f"抽出フレーム数: {len(frames)}")
 
 st.divider()
 
@@ -155,7 +145,6 @@ event = st.radio(
 
 st.session_state.event = event
 
-
 # =========================
 # 実行ボタン
 # =========================
@@ -165,15 +154,12 @@ if st.button("🔥 着火　🔥", key="start_button"):
         st.warning("イベントを選択して")
     else:
 
-        # =========================
-        # 👇 ここが⑤（この位置に移動）
-        # =========================
         vision_context = ""
 
         if video_file and start_time and end_time:
 
             with open("input.mp4", "wb") as f:
-                f.write(video_file.read())
+                f.write(video_file.getvalue())
 
             trim_video("input.mp4", start_time, end_time, "clip.mp4")
 
@@ -184,9 +170,6 @@ if st.button("🔥 着火　🔥", key="start_button"):
             if len(frames) > 0:
                 vision_context = analyze_frames_with_gpt(frames, client)
 
-        # =========================
-        # 👇 GPT実行（ここに混ぜる）
-        # =========================
         with st.spinner("考え中..."):
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -201,6 +184,21 @@ if st.button("🔥 着火　🔥", key="start_button"):
                     }
                 ]
             )
+
+        raw = response.choices[0].message.content  # 👈 復活
+
+        outputs = [line for line in raw.strip().split("\n") if line.strip()]
+        while len(outputs) < 3:
+            outputs.append("（出力不足）")
+        outputs = outputs[:3]
+
+        st.session_state.history.append({  # 👈 復活
+            "event": st.session_state.event,
+            "outputs": outputs,
+            "ratings": [None, None, None]
+        })
+
+        st.session_state.history = st.session_state.history[-3:]
 # =========================
 # 👇 常に表示されるエリア（ここが重要）
 # =========================
