@@ -49,11 +49,6 @@ def extract_frames(video_path, output_dir="frames", interval=3):
     cap.release()
     return saved
 
-# 修正①
-with open("input.mp4", "wb") as f:
-    f.write(video_file.getvalue())
-
-# 修正②
 def trim_video(input_path, start, end, output_path):
     command = [
         "ffmpeg",
@@ -64,11 +59,7 @@ def trim_video(input_path, start, end, output_path):
         "-c", "copy",
         output_path
     ]
-    try:
-        subprocess.run(command, check=True)
-    except:
-        st.error("動画処理に失敗（ffmpeg未対応の可能性）")
-        return
+    subprocess.run(command)
 
 def analyze_frames_with_gpt(frame_paths, client):
     descriptions = []
@@ -165,10 +156,12 @@ if st.button("🔥 着火　🔥", key="start_button"):
 
         vision_context = ""
 
-        if video_file and start_time and end_time:
+        if video_file is not None and start_time and end_time:
+
+            video_bytes = video_file.getvalue()
 
             with open("input.mp4", "wb") as f:
-                f.write(video_file.getvalue())
+                f.write(video_bytes)
 
             trim_video("input.mp4", start_time, end_time, "clip.mp4")
 
@@ -194,20 +187,21 @@ if st.button("🔥 着火　🔥", key="start_button"):
                 ]
             )
 
-        raw = response.choices[0].message.content  # 👈 復活
+        raw = response.choices[0].message.content
 
         outputs = [line for line in raw.strip().split("\n") if line.strip()]
         while len(outputs) < 3:
             outputs.append("（出力不足）")
         outputs = outputs[:3]
 
-        st.session_state.history.append({  # 👈 復活
+        st.session_state.history.append({
             "event": st.session_state.event,
             "outputs": outputs,
             "ratings": [None, None, None]
         })
 
         st.session_state.history = st.session_state.history[-3:]
+
 # =========================
 # 👇 常に表示されるエリア（ここが重要）
 # =========================
@@ -215,7 +209,6 @@ if len(st.session_state.history) > 0:
 
     last = st.session_state.history[-1]
 
-    # 👇 表示
     st.subheader("🔥ちくちく一言🔥")
 
     for i, text in enumerate(last["outputs"]):
@@ -224,7 +217,6 @@ if len(st.session_state.history) > 0:
 
         col1, col2 = st.columns(2)
 
-        # 👍
         with col1:
             if st.button(
                 f"いいちくちく👍",
@@ -235,7 +227,6 @@ if len(st.session_state.history) > 0:
                 last["ratings"][i] = "good"
                 st.toast(f"{i+1}個目：👍 保存")
 
-        # 👎
         with col2:
             if st.button(
                 f"よくないちくちく👎",
@@ -246,7 +237,6 @@ if len(st.session_state.history) > 0:
                 last["ratings"][i] = "bad"
                 st.toast(f"{i+1}個目：👎 保存")
 
-        # 評価表示
         if last.get("ratings") and last["ratings"][i]:
             if last["ratings"][i] == "good":
                 st.success("→ 👍 評価済み")
@@ -255,21 +245,16 @@ if len(st.session_state.history) > 0:
 
         st.divider()
 
-    # =========================
-    # 👇 ここもこのブロック内に入れる
-    # =========================
     combined = "\n".join(
         [f"{i+1}. {t}" for i, t in enumerate(last["outputs"])]
     )
 
     st.code(combined)
 
-    # コピー用
     if st.button("🔥 コピー用", key=f"copy_latest_{len(st.session_state.history)}"):
         st.toast("下のテキストをコピー！（Ctrl+C）")
 
-    # Xシェア
-    url_link = "https://your-app-url.com"  # 後で変更
+    url_link = "https://your-app-url.com"
 
     share_text = f"""ちくちくコーチングAIからのフィードバック
 
@@ -288,9 +273,7 @@ if len(st.session_state.history) > 0:
     url = f"https://twitter.com/intent/tweet?text={tweet}"
 
     st.link_button("🔥 Xでシェア", url)
-# =========================
-# 履歴表示（修正版）
-# =========================
+
 if len(st.session_state.history) > 0:
 
     st.subheader("これまでのちくちく")
@@ -302,14 +285,12 @@ if len(st.session_state.history) > 0:
         for j, line in enumerate(item["outputs"]):
             st.write(f"{j+1}. {line}")
 
-            # 👇 評価表示（ここが重要：ratingsに対応）
             if item.get("ratings") and item["ratings"][j]:
                 if item["ratings"][j] == "good":
                     st.write("→ 👍")
                 else:
                     st.write("→ 👎")
 
-        # 👇 各履歴シェア
         share_text = f"""ちくちくコーチングAIからのフィードバック
 
 {item["outputs"][0]}
