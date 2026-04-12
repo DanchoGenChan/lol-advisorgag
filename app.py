@@ -238,7 +238,6 @@ if len(st.session_state.history) > 0:
         st.divider()
 
     combined = "\n".join(last["outputs"])
-    )
 
     st.code(combined)
 
