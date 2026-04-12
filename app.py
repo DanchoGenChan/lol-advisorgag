@@ -205,7 +205,7 @@ if len(st.session_state.history) > 0:
 
     for i, text in enumerate(last["outputs"]):
 
-        st.success(f"{i+1}. {text}")
+        st.success(f"{text}")
 
         col1, col2 = st.columns(2)
 
@@ -237,8 +237,7 @@ if len(st.session_state.history) > 0:
 
         st.divider()
 
-    combined = "\n".join(
-        [f"{i+1}. {t}" for i, t in enumerate(last["outputs"])]
+    combined = "\n".join(last["outputs"])
     )
 
     st.code(combined)
