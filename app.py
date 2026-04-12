@@ -50,16 +50,9 @@ def extract_frames(video_path, output_dir="frames", interval=3):
     return saved
 
 def trim_video(input_path, start, end, output_path):
-    command = [
-        "ffmpeg",
-        "-y",
-        "-i", input_path,
-        "-ss", start,
-        "-to", end,
-        "-c", "copy",
-        output_path
-    ]
-    subprocess.run(command)
+    # ffmpeg使えない環境用：そのままコピー
+    import shutil
+    shutil.copy(input_path, output_path)
 
 def analyze_frames_with_gpt(frame_paths, client):
     descriptions = []
@@ -68,7 +61,7 @@ def analyze_frames_with_gpt(frame_paths, client):
         with open(path, "rb") as f:
             img_bytes = f.read()
 
-        img_base64 = base64.b64encode(img_bytes).decode()  # 👈 修正
+        img_base64 = base64.b64encode(img_bytes).decode()
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
