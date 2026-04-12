@@ -254,7 +254,7 @@ if len(st.session_state.history) > 0:
 
 #LOL #LeagueOfLegends #ちくちく #コーチング
 
-👇自己責任でどうぞ
+👇君もちくちくされてみないか
 {url_link}
 """
 
@@ -287,7 +287,7 @@ if len(st.session_state.history) > 0:
 {item["outputs"][2]}
 
 #LOL #LeagueOfLegends #ちくちく #コーチング
-👇自己責任でどうぞ
+👇君もちくちくされてみないか
 {url_link}
 """
 
@@ -299,6 +299,6 @@ if len(st.session_state.history) > 0:
         st.divider()
 
 st.divider()
-st.markdown("🚩初心者～中級者向けの普通のコーチングアプリ作ってます🚩")
-st.markdown("👇作業中の１杯はこちらから👇")
+st.markdown("🚩初心者～中級者向けのマジで使えるアプリ目指して改良中です🚩")
+st.markdown("👇よかったら作業中の1杯奢ってくださいな！👇")
 st.link_button("☕ コーヒー奢る", "https://buymeacoffee.com/egg_plant")
