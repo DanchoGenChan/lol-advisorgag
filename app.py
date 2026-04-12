@@ -257,7 +257,7 @@ if len(st.session_state.history) > 0:
     if st.button("🔥 コピー用", key=f"copy_latest_{len(st.session_state.history)}"):
         st.toast("下のテキストをコピー！（Ctrl+C）")
 
-    url_link = "https://your-app-url.com"
+    url_link = "https://lol-coaching-chiku-chiku-ai.streamlit.app/"
 
     share_text = f"""ちくちくコーチングAIからのフィードバック
 
