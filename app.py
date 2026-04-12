@@ -3,7 +3,86 @@ import os
 from openai import OpenAI
 from main import build_prompt
 import urllib.parse
+import subprocess
+import cv2
+import os
 
+def extract_frames(video_path, output_dir="frames", interval=3):
+    os.makedirs(output_dir, exist_ok=True)
+
+    cap = cv2.VideoCapture(video_path)
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    count = 0
+    saved = []
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        if fps == 0:
+            break
+
+        if count % (fps * interval) == 0:
+            sec = int(count / fps)
+            timestamp = f"{sec//60:02d}:{sec%60:02d}"
+
+            path = f"{output_dir}/frame_{count}_{timestamp}.jpg"
+
+            # 👇 フレームに時間を描画
+            cv2.putText(
+                frame,
+                f"{timestamp}",
+                (30, 50),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (0, 255, 0),
+                2,
+                cv2.LINE_AA
+            )
+
+            cv2.imwrite(path, frame)
+            saved.append(path)
+
+        count += 1
+
+    cap.release()
+    return saved
+def trim_video(input_path, start, end, output_path):
+    command = [
+        "ffmpeg",
+        "-y",
+        "-i", input_path,
+        "-ss", start,
+        "-to", end,
+        "-c", "copy",
+        output_path
+    ]
+    subprocess.run(command)
+
+def analyze_frames_with_gpt(frame_paths, client):
+    descriptions = []
+
+    for path in frame_paths[:3]:  # 最大3枚で軽量化
+        with open(path, "rb") as f:
+            img_bytes = f.read()
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "LoLの試合画面。この状況を具体的に説明しろ（HP状況・位置・人数差・危険度）"},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_bytes.hex()}"}}
+                    ]
+                }
+            ]
+        )
+
+        descriptions.append(response.choices[0].message.content)
+
+    return "\n".join(descriptions)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -29,12 +108,28 @@ video_file = st.file_uploader(
 if video_file:
     st.video(video_file)
 
+# 👇ここに追加
+if video_file and start_time and end_time:
+
+    with open("input.mp4", "wb") as f:
+        f.write(video_file.read())
+
+    trim_video("input.mp4", start_time, end_time, "clip.mp4")
+
+    frames = extract_frames("clip.mp4")
+
+    st.write(f"抽出フレーム数: {len(frames)}")
+
 st.divider()
 
 # =========================
 # 入力
 # =========================
 st.subheader("状況入力")
+st.subheader("⏱ シーン指定")
+
+start_time = st.text_input("開始時間 (例: 00:01:40)")
+end_time = st.text_input("終了時間 (例: 00:01:55)")
 
 lane = st.selectbox(
     "レーン",
@@ -69,6 +164,29 @@ if st.button("🔥 着火　🔥", key="start_button"):
     if st.session_state.event is None:
         st.warning("イベントを選択して")
     else:
+
+        # =========================
+        # 👇 ここが⑤（この位置に移動）
+        # =========================
+        vision_context = ""
+
+        if video_file and start_time and end_time:
+
+            with open("input.mp4", "wb") as f:
+                f.write(video_file.read())
+
+            trim_video("input.mp4", start_time, end_time, "clip.mp4")
+
+            frames = extract_frames("clip.mp4")
+
+            st.write(f"抽出フレーム数: {len(frames)}")
+
+            if len(frames) > 0:
+                vision_context = analyze_frames_with_gpt(frames, client)
+
+        # =========================
+        # 👇 GPT実行（ここに混ぜる）
+        # =========================
         with st.spinner("考え中..."):
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -79,27 +197,10 @@ if st.button("🔥 着火　🔥", key="start_button"):
                             lane,
                             time,
                             st.session_state.event
-                        )
+                        ) + f"\n\n【参考情報（動画分析）】\n{vision_context}"
                     }
                 ]
             )
-
-        raw = response.choices[0].message.content
-
-        outputs = [line for line in raw.strip().split("\n") if line.strip()]
-        # 👇 足りなかったら補完
-        while len(outputs) < 3:
-            outputs.append("（出力不足）")
-        outputs = outputs[:3]
-
-        st.session_state.history.append({
-            "event": st.session_state.event,
-            "outputs": outputs,
-            "ratings": [None, None, None]
-        })
-
-        st.session_state.history = st.session_state.history[-3:]
-
 # =========================
 # 👇 常に表示されるエリア（ここが重要）
 # =========================
