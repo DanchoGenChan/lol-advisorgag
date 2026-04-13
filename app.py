@@ -1,3 +1,4 @@
+from PIL import Image, ImageDraw, ImageFont
 import streamlit as st
 import os
 from openai import OpenAI
@@ -81,6 +82,44 @@ def analyze_frames_with_gpt(frame_paths, client):
     return "\n".join(descriptions)
 
 def pick_worst_frame(frame_paths, client):
+    def create_share_image(img_path, comments, output_path="share.png"):
+
+    img = Image.open(img_path).convert("RGB")
+    draw = ImageDraw.Draw(img)
+
+    width, height = img.size
+
+    # 👇 半透明黒背景
+    overlay_height = int(height * 0.35)
+    overlay = Image.new("RGBA", (width, overlay_height), (0, 0, 0, 180))
+    img.paste(overlay, (0, height - overlay_height), overlay)
+
+    draw = ImageDraw.Draw(img)
+
+    # 👇 フォント（なければデフォルト）
+    try:
+        font = ImageFont.truetype("arial.ttf", 32)
+    except:
+        font = ImageFont.load_default()
+
+    # 👇 テキスト整形
+    text = "\n".join([
+        f"① {comments[0]}",
+        f"② {comments[1]}",
+        f"③ {comments[2]}"
+    ])
+
+    # 👇 描画位置
+    draw.multiline_text(
+        (20, height - overlay_height + 20),
+        text,
+        fill=(255, 255, 255),
+        font=font,
+        spacing=10
+    )
+
+    img.save(output_path)
+    return output_path
 
     descriptions = []
 
@@ -311,6 +350,25 @@ if "best_frame" in st.session_state:
 
     share_text = f"""ちくちくコーチングAIからのフィードバック
 
+st.link_button("🔥 Xでシェア", url)
+# =========================
+# 👇 画像生成＆ダウンロード
+# =========================
+if "best_frame" in st.session_state:
+
+    if st.button("📸 シェア画像を作成"):
+
+        share_img = create_share_image(
+            st.session_state.best_frame,
+            last["outputs"]
+        )
+
+        with open(share_img, "rb") as f:
+            st.download_button(
+                "📥 画像をダウンロード",
+                f,
+                file_name="lol_coaching.png"
+            )
 
 {last['outputs'][0]}
 {last['outputs'][1]}
