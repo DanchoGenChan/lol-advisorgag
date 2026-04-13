@@ -395,7 +395,7 @@ if len(st.session_state.history) > 0:
 
             share_img = create_share_image(
                 st.session_state.best_frame,
-                last["outputs"]
+                last["outputs"],
                 last["diagnosis"]
             )
 
