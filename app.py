@@ -2,7 +2,7 @@ from PIL import Image, ImageDraw, ImageFont
 import streamlit as st
 import os
 from openai import OpenAI
-from main import build_prompt
+from main import build_prompt, evaluate_macro_value, evaluate_lane_trade, diagnose_player  # ← 追加
 import urllib.parse
 import subprocess
 import cv2
@@ -205,7 +205,6 @@ lane = st.selectbox(
     key="lane_select"
 )
 
-
 # =========================
 # イベント選択
 # =========================
@@ -248,22 +247,35 @@ if st.button("🔥 着火　🔥", key="start_button"):
                 best_frame, vision_context = pick_worst_frame(frames, client)
                 st.session_state.best_frame = best_frame
 
+        # 👇 追加（評価エンジン）
+        macro_eval = evaluate_macro_value(st.session_state.event, vision_context)
+        lane_eval = evaluate_lane_trade(vision_context)
+        diagnosis = diagnose_player(macro_eval, lane_eval)
+
         with st.spinner("考え中..."):
+            content = build_prompt(
+                lane,
+                f"{start_time}〜{end_time}",
+                st.session_state.event
+            ) + f"""
+
+【画面分析】
+{vision_context}
+
+【内部評価】
+{macro_eval}
+{lane_eval}
+
+【ルール】
+・数値（点数）は絶対に出すな
+・初心者にもわかる言葉で言え
+・詰問口調で
+・改善案を出せ
+"""
+
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": build_prompt(
-                            lane,
-                            f"{start_time}〜{end_time}",
-                            st.session_state.event
-                        ) + f"""【重要：以下は実際の画面分析】
-                                   {vision_context}
-                             この情報を必ず使って具体的に指摘、改善案の提示をしろ
-                             """
-                    }
-                ]
+                messages=[{"role": "user", "content": content}]
             )
 
         raw = response.choices[0].message.content
@@ -276,7 +288,8 @@ if st.button("🔥 着火　🔥", key="start_button"):
         st.session_state.history.append({
             "event": st.session_state.event,
             "outputs": outputs,
-            "ratings": [None, None, None]
+            "ratings": [None, None, None],
+            "diagnosis": diagnosis  # ← 追加
         })
 
         st.session_state.history = st.session_state.history[-3:]
@@ -295,6 +308,11 @@ if "best_frame" in st.session_state:
         caption="🔥 一番ヤバいシーン",
         use_container_width=True
     )
+
+    # 👇 診断表示追加
+    if "diagnosis" in last:
+        st.subheader(f"🧠 診断結果：{last['diagnosis']}")
+
     st.subheader("🔥ちくちく一言🔥")
 
     for i, text in enumerate(last["outputs"]):
@@ -307,8 +325,6 @@ if "best_frame" in st.session_state:
 
         with col_text:
             st.success(text)
-
-
 
         col1, col2 = st.columns(2)
 
@@ -339,89 +355,3 @@ if "best_frame" in st.session_state:
                 st.error("→ 👎 評価済み")
 
         st.divider()
-
-    combined = "\n".join(last["outputs"])
-
-    st.code(combined)
-
-    if st.button("🔥 コピー用", key=f"copy_latest_{len(st.session_state.history)}"):
-        st.toast("下のテキストをコピー！（Ctrl+C）")
-
-    url_link = "https://lol-coaching-chiku-chiku-ai.streamlit.app/"
-
-    share_text = f"""ちくちくコーチングAIからのフィードバック
-
-st.link_button("🔥 Xでシェア", url)
-# =========================
-# 👇 画像生成＆ダウンロード
-# =========================
-if "best_frame" in st.session_state:
-
-    if st.button("📸 シェア画像を作成"):
-
-        share_img = create_share_image(
-            st.session_state.best_frame,
-            last["outputs"]
-        )
-
-        with open(share_img, "rb") as f:
-            st.download_button(
-                "📥 画像をダウンロード",
-                f,
-                file_name="lol_coaching.png"
-            )
-
-{last['outputs'][0]}
-{last['outputs'][1]}
-{last['outputs'][2]}
-
-#LOL #LeagueOfLegends #ちくちく #コーチング
-
-👇君もちくちくされてみないか
-{url_link}
-"""
-
-    tweet = urllib.parse.quote(share_text)
-    url = f"https://twitter.com/intent/tweet?text={tweet}"
-
-    st.link_button("🔥 Xでシェア", url)
-
-if len(st.session_state.history) > 0:
-
-    st.subheader("これまでのちくちく")
-
-    for i, item in enumerate(reversed(st.session_state.history)):
-
-        st.markdown(f"### {i+1}回目（{item['event']}）")
-
-        for j, line in enumerate(item["outputs"]):
-            st.write(f"{j+1}. {line}")
-
-            if item.get("ratings") and item["ratings"][j]:
-                if item["ratings"][j] == "good":
-                    st.write("→ 👍")
-                else:
-                    st.write("→ 👎")
-
-        share_text = f"""ちくちくコーチングAIからのフィードバック
-
-{item["outputs"][0]}
-{item["outputs"][1]}
-{item["outputs"][2]}
-
-#LOL #LeagueOfLegends #ちくちく #コーチング
-👇君もちくちくされてみないか
-{url_link}
-"""
-
-        tweet = urllib.parse.quote(share_text)
-        url = f"https://twitter.com/intent/tweet?text={tweet}"
-
-        st.link_button("🔥 この回をXでシェア", url)
-
-        st.divider()
-
-st.divider()
-st.markdown("🚩初心者～中級者向けのマジで使えるアプリ目指して改良中です🚩")
-st.markdown("👇よかったら作業中の1杯奢ってくださいな！👇")
-st.link_button("☕ コーヒー奢る", "https://buymeacoffee.com/egg_plant")

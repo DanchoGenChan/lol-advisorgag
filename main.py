@@ -2,6 +2,33 @@ import random
 
 def build_prompt(lane, time, situation, feedback=None):
 
+    macro_rules = """
+【マクロ評価ルール】
+
+このゲームはネクサス破壊が最終目的であり、全ての行動はその価値で評価する。
+
+■ オブジェクト価値（目安）
+ネクサス: 100
+エルダー: 90
+バロン: 70
+ドラゴンソウル: 75
+ドラゴン1体: 15
+ヘラルド: 35
+ミッド1stタワー: 50
+サイドタワー: 20
+
+■ 判断ルール
+・常に「どちらが価値が高いか」で判断すること
+・トレード（交換）時は必ず価値差を意識すること
+・バロンはタワー取得が前提なら価値が上がる
+・ソウルやエルダー前は戦闘リソース（ウルト・サモスペ）の価値が上がる
+・価値の低いオブジェクトのために高価値を捨てるのは明確なミス
+
+■ 出力ルール
+・数値（点数）は絶対に出すな（内部思考のみで使う）
+・感覚ではなく、理由を明確にすること
+"""
+
     feedback_text = ""
 
     if feedback:
@@ -50,10 +77,14 @@ def build_prompt(lane, time, situation, feedback=None):
 ▼例のニュアンス（コピペ禁止）
 ・「そのHPで前出るの普通に意味わからん」
 ・「ウェーブ見てから動けよ、なんで突っ込んだ？」
-・「これから上手くになるといいね」
+・「これから上手くなるといいね」
 """
 
     return f"""
+あなたはLoLのプロコーチです。
+
+{macro_rules}
+
 {style_rules}
 
 {feedback_text}
@@ -65,3 +96,45 @@ def build_prompt(lane, time, situation, feedback=None):
 
 この状況を見て、上のルールに従って3行でコメントしろ。
 """
+
+
+def evaluate_macro_value(event, vision_context):
+    """
+    オブジェクト価値ベースで判断する
+    """
+
+    values = {
+        "nexus": 100,
+        "elder": 90,
+        "baron": 70,
+        "soul": 75,
+        "dragon": 15,
+        "mid_tower": 50,
+        "side_tower": 20,
+        "herald": 35,
+        "voidgrub": 10
+    }
+
+    # 超簡易ロジック（あとで強化可能）
+    if "ドラゴン" in vision_context:
+        return "ドラゴンの価値を無視している"
+    if "バロン" in vision_context:
+        return "バロンへの対応が遅れている"
+    if "タワー" in vision_context:
+        return "低価値オブジェクトに固執している"
+
+    return "オブジェクト価値の判断が曖昧"
+
+
+def evaluate_lane_trade(vision_context):
+    """
+    レーン戦ロジック
+    """
+
+    if "HP差" in vision_context and "負け" in vision_context:
+        return "ダメトレ負けてるのに殴り返してない"
+
+    if "CS" in vision_context:
+        return "CS取るタイミングでプレッシャーかけれてない"
+
+    return "トレード判断が甘い"
