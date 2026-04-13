@@ -211,11 +211,17 @@ diagnosis = ""
 
 if st.button("🔥 着火　🔥", key="start_button"):
 
+    st.write("① ボタン押下通過")  # ←追加
+
     if st.session_state.event is None:
         st.warning("イベントを選択して")
     else:
 
+        st.write("② イベントOK")  # ←追加
+
         if video_file is not None and start_time and end_time:
+
+            st.write("③ 動画処理入る")  # ←追加
 
             video_bytes = video_file.getvalue()
 
@@ -230,12 +236,18 @@ if st.button("🔥 着火　🔥", key="start_button"):
             if len(frames) > 0:
                 best_frame, vision_context = pick_worst_frame(frames, client)
                 st.session_state.best_frame = best_frame
+                st.write("④ 診断前")  # ←追加
+
 
         macro_eval = evaluate_macro_value(st.session_state.event, vision_context)
         lane_eval = evaluate_lane_trade(vision_context)
         diagnosis = diagnose_player(macro_eval, lane_eval)
 
+        st.write("⑤ 診断後")  # ←追加
+
         with st.spinner("考え中..."):
+
+            st.write("⑥ API前")  # ←追加
 
             content = build_prompt(
                 lane,
@@ -256,6 +268,8 @@ if st.button("🔥 着火　🔥", key="start_button"):
                 messages=[{"role": "user", "content": content}]
             )
 
+            st.write("⑦ API後")  # ←追加
+
         raw = response.choices[0].message.content
 
         outputs = [line for line in raw.strip().split("\n") if line.strip()]
@@ -271,3 +285,5 @@ if st.button("🔥 着火　🔥", key="start_button"):
         })
 
         st.session_state.history = st.session_state.history[-3:]
+
+st.write("⑧ レスポンス取得")  # ←追加
