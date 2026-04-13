@@ -378,6 +378,25 @@ if len(st.session_state.history) > 0:
 
 #LOL #LeagueOfLegends #ちくちく #コーチング
 
+# =========================
+# 👇 画像生成＆ダウンロード
+# =========================
+if "best_frame" in st.session_state:
+
+    if st.button("📸 シェア画像を作成"):
+
+        share_img = create_share_image(
+            st.session_state.best_frame,
+            last["outputs"]
+        )
+
+        with open(share_img, "rb") as f:
+            st.download_button(
+                "📥 画像をダウンロード",
+                f,
+                file_name="lol_coaching.png"
+            )
+
 👇君もちくちくされてみないか
 {url_link}
 """
