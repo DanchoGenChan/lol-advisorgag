@@ -81,35 +81,34 @@ def analyze_frames_with_gpt(frame_paths, client):
 
     return "\n".join(descriptions)
 
-def pick_worst_frame(frame_paths, client):
-    def create_share_image(img_path, comments, output_path="share.png"):
+def create_share_image(img_path, comments, output_path="share.png"):
 
     img = Image.open(img_path).convert("RGB")
     draw = ImageDraw.Draw(img)
 
     width, height = img.size
 
-    # 👇 半透明黒背景
+    # 半透明黒背景
     overlay_height = int(height * 0.35)
     overlay = Image.new("RGBA", (width, overlay_height), (0, 0, 0, 180))
     img.paste(overlay, (0, height - overlay_height), overlay)
 
     draw = ImageDraw.Draw(img)
 
-    # 👇 フォント（なければデフォルト）
+    # フォント
     try:
         font = ImageFont.truetype("arial.ttf", 32)
     except:
         font = ImageFont.load_default()
 
-    # 👇 テキスト整形
+    # テキスト
     text = "\n".join([
         f"① {comments[0]}",
         f"② {comments[1]}",
         f"③ {comments[2]}"
     ])
 
-    # 👇 描画位置
+    # 描画
     draw.multiline_text(
         (20, height - overlay_height + 20),
         text,
@@ -120,6 +119,8 @@ def pick_worst_frame(frame_paths, client):
 
     img.save(output_path)
     return output_path
+
+def pick_worst_frame(frame_paths, client):
 
     descriptions = []
 
