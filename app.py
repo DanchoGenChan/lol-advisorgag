@@ -303,12 +303,72 @@ if st.button("🔥 着火　🔥", key="start_button"):
 st.write("⑧ レスポンス取得")  # ←追加
 
 # =========================
-# 👇 共有テキスト生成
+# 👇 常に表示されるエリア（修正版）
 # =========================
 if len(st.session_state.history) > 0:
 
     last = st.session_state.history[-1]
+    frames = st.session_state.frames
 
+    # 👇 best_frameなくても動くようにする
+    if "best_frame" in st.session_state:
+        st.image(
+            st.session_state.best_frame,
+            caption="🔥 一番ヤバいシーン",
+            use_container_width=True
+        )
+
+    # 👇 診断
+    if "diagnosis" in last:
+        st.subheader(f"🧠 診断結果：{last['diagnosis']}")
+
+    st.subheader("🔥ちくちく一言🔥")
+
+    for i, text in enumerate(last["outputs"]):
+
+        col_img, col_text = st.columns([1, 2])
+
+        with col_img:
+            if i < len(frames):
+                st.image(frames[i], use_container_width=True)
+
+        with col_text:
+            st.success(text)
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button(
+                f"いいちくちく👍",
+                key=f"good_{len(st.session_state.history)}_{i}"
+            ):
+                last["ratings"][i] = "good"
+                st.toast(f"{i+1}個目：👍 保存")
+
+        with col2:
+            if st.button(
+                f"よくないちくちく👎",
+                key=f"bad_{len(st.session_state.history)}_{i}"
+            ):
+                last["ratings"][i] = "bad"
+                st.toast(f"{i+1}個目：👎 保存")
+
+        if last["ratings"][i]:
+            if last["ratings"][i] == "good":
+                st.success("→ 👍 評価済み")
+            else:
+                st.error("→ 👎 評価済み")
+
+        st.divider()
+
+    # 👇 コピー用
+    combined = "\n".join(last["outputs"])
+    st.code(combined)
+
+    if st.button("🔥 コピー用"):
+        st.toast("コピーして使え")
+
+    # 👇 シェア復活
     url_link = "https://lol-coaching-chiku-chiku-ai.streamlit.app/"
 
     share_text = f"""ちくちくコーチングAIからのフィードバック
@@ -327,5 +387,3 @@ if len(st.session_state.history) > 0:
     url = f"https://twitter.com/intent/tweet?text={tweet}"
 
     st.link_button("🔥 Xでシェア", url)
-
-
