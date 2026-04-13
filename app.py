@@ -274,14 +274,34 @@ if st.button("🔥 着火　🔥", key="start_button"):
        ・改善案を出せ
        """
 
+            content = build_prompt(
+                 lane,
+                 f"{start_time}〜{end_time}",
+                 st.session_state.event
+            ) + f"""
+            【画面分析】
+            {vision_context}
+
+            【内部評価】
+            {macro_eval}
+            {lane_eval}
+
+            【ルール】
+            ・数値（点数は絶対に出すな）
+            ・初心者にもわかる言葉で言え
+            ・詰問口調で
+            ・改善案を出せ
+            """
+            
+
+            st.write("⑥ API前") # ←追加
+
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": content}]
-             )
+            )
 
-            st.write("⑦ API後")  # ←追加
-
-        raw = response.choices[0].message.content
+            st.write("⑦ API後")
 
         outputs = [line for line in raw.strip().split("\n") if line.strip()]
         while len(outputs) < 3:
@@ -298,3 +318,31 @@ if st.button("🔥 着火　🔥", key="start_button"):
         st.session_state.history = st.session_state.history[-3:]
 
 st.write("⑧ レスポンス取得")  # ←追加
+
+# =========================
+# 👇 共有テキスト生成
+# =========================
+if len(st.session_state.history) > 0:
+
+    last = st.session_state.history[-1]
+
+    url_link = "https://lol-coaching-chiku-chiku-ai.streamlit.app/"
+
+    share_text = f"""ちくちくコーチングAIからのフィードバック
+
+{last['outputs'][0]}
+{last['outputs'][1]}
+{last['outputs'][2]}
+
+#LOL #LeagueOfLegends #ちくちく #コーチング
+
+👇君もちくちくされてみないか
+{url_link}
+"""
+
+    tweet = urllib.parse.quote(share_text)
+    url = f"https://twitter.com/intent/tweet?text={tweet}"
+
+    st.link_button("🔥 Xでシェア", url)
+
+
