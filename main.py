@@ -147,10 +147,10 @@ def diagnose_player(macro_eval, lane_eval):
     text = f"{macro_eval} / {lane_eval}"
 
     if "曖昧" in text:
-        return "歩くサンドバッグ"
+        return "思考停止してる"
 
     if "低価値" in text:
-        return "謝りながらファームしてほしい"
+        return "一生アイテムそろわない人"
 
     if "殴り返してない" in text:
         return "チキン野郎"
