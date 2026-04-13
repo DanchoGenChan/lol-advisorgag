@@ -366,30 +366,36 @@ if len(st.session_state.history) > 0:
 
     if st.button("🔥 コピー用"):
         st.toast("コピーして使え")
-        # =========================
-# 👇 画像生成＆ダウンロード
-# =========================
-if "best_frame" in st.session_state:
 
-    if st.button("📸 シェア画像を作成"):
+    # =========================
+    # 👇 画像生成＆ダウンロード
+    # =========================
+    if "best_frame" in st.session_state:
 
-        share_img = create_share_image(
-            st.session_state.best_frame,
-            last["outputs"]
-        )
+        st.info("👇 画像を保存してツイートに貼れ")
 
-        with open(share_img, "rb") as f:
-            st.download_button(
-                "📥 画像をダウンロード",
-                f,
-                file_name="lol_coaching.png"
+        if st.button("📸 シェア画像を作成"):
+
+            share_img = create_share_image(
+                st.session_state.best_frame,
+                last["outputs"]
             )
-    # 👇 シェア復活
+
+            with open(share_img, "rb") as f:
+                st.download_button(
+                    "📥 画像をダウンロード",
+                    f,
+                    file_name="lol_coaching.png"
+                )
+
+    # =========================
+    # 👇 シェア
+    # =========================
     url_link = "https://lol-coaching-chiku-chiku-ai.streamlit.app/"
 
     share_text = f"""ちくちくAIからのフィードバック
 
-{last['diagnosis']}
+🧠 診断：{last['diagnosis']}
 
 {last['outputs'][0]}
 {last['outputs'][1]}
