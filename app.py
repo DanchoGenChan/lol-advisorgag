@@ -80,33 +80,50 @@ def analyze_frames_with_gpt(frame_paths, client):
 
     return "\n".join(descriptions)
 
-def create_share_image(img_path, comments, output_path="share.png"):
+def create_share_image(img_path, comments, diagnosis, output_path="share.png"):
 
     img = Image.open(img_path).convert("RGB")
     draw = ImageDraw.Draw(img)
 
     width, height = img.size
 
-    overlay_height = int(height * 0.35)
+    # 半透明黒背景
+    overlay_height = int(height * 0.4)
     overlay = Image.new("RGBA", (width, overlay_height), (0, 0, 0, 180))
     img.paste(overlay, (0, height - overlay_height), overlay)
 
     draw = ImageDraw.Draw(img)
 
+    # フォント
     try:
+        title_font = ImageFont.truetype("arial.ttf", 40)
         font = ImageFont.truetype("arial.ttf", 32)
     except:
+        title_font = ImageFont.load_default()
         font = ImageFont.load_default()
 
-    text = "\n".join([
+    # 👇 診断テキスト
+    diagnosis_text = f"🧠 {diagnosis}"
+
+    # 👇 コメント
+    comment_text = "\n".join([
         f"① {comments[0]}",
         f"② {comments[1]}",
         f"③ {comments[2]}"
     ])
 
+    # 👇 描画（診断）
+    draw.text(
+        (20, height - overlay_height + 10),
+        diagnosis_text,
+        fill=(255, 100, 100),
+        font=title_font
+    )
+
+    # 👇 描画（コメント）
     draw.multiline_text(
-        (20, height - overlay_height + 20),
-        text,
+        (20, height - overlay_height + 60),
+        comment_text,
         fill=(255, 255, 255),
         font=font,
         spacing=10
@@ -379,6 +396,7 @@ if len(st.session_state.history) > 0:
             share_img = create_share_image(
                 st.session_state.best_frame,
                 last["outputs"]
+                last["diagnosis"]
             )
 
             with open(share_img, "rb") as f:
