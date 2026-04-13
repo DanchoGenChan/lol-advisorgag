@@ -2,13 +2,12 @@ from PIL import Image, ImageDraw, ImageFont
 import streamlit as st
 import os
 from openai import OpenAI
-from main import build_prompt, evaluate_macro_value, evaluate_lane_trade, diagnose_player  # ← 追加
+from main import build_prompt, evaluate_macro_value, evaluate_lane_trade, diagnose_player
 import urllib.parse
 import subprocess
 import cv2
 import os
-import base64  # 👈 追加
-from main import evaluate_macro_value, evaluate_lane_trade, diagnose_player
+import base64
 
 def extract_frames(video_path, output_dir="frames", interval=3):
     os.makedirs(output_dir, exist_ok=True)
@@ -52,7 +51,6 @@ def extract_frames(video_path, output_dir="frames", interval=3):
     return saved
 
 def trim_video(input_path, start, end, output_path):
-    # ffmpeg使えない環境用：そのままコピー
     import shutil
     shutil.copy(input_path, output_path)
 
@@ -89,27 +87,23 @@ def create_share_image(img_path, comments, output_path="share.png"):
 
     width, height = img.size
 
-    # 半透明黒背景
     overlay_height = int(height * 0.35)
     overlay = Image.new("RGBA", (width, overlay_height), (0, 0, 0, 180))
     img.paste(overlay, (0, height - overlay_height), overlay)
 
     draw = ImageDraw.Draw(img)
 
-    # フォント
     try:
         font = ImageFont.truetype("arial.ttf", 32)
     except:
         font = ImageFont.load_default()
 
-    # テキスト
     text = "\n".join([
         f"① {comments[0]}",
         f"② {comments[1]}",
         f"③ {comments[2]}"
     ])
 
-    # 描画
     draw.multiline_text(
         (20, height - overlay_height + 20),
         text,
@@ -178,9 +172,6 @@ if "frames" not in st.session_state:
 
 total = len(st.session_state.history)
 
-# =========================
-# 動画
-# =========================
 video_file = st.file_uploader(
     "動画ファイルをアップロード",
     type=["mp4", "webm"],
@@ -191,9 +182,6 @@ if video_file:
 
 st.divider()
 
-# =========================
-# 入力
-# =========================
 st.subheader("状況入力")
 st.subheader("⏱ シーン指定")
 
@@ -206,9 +194,6 @@ lane = st.selectbox(
     key="lane_select"
 )
 
-# =========================
-# イベント選択
-# =========================
 st.subheader("イベント選択")
 
 event = st.radio(
@@ -219,16 +204,16 @@ event = st.radio(
 
 st.session_state.event = event
 
-# =========================
-# 実行ボタン
-# =========================
+vision_context = ""
+macro_eval = ""
+lane_eval = ""
+diagnosis = ""
+
 if st.button("🔥 着火　🔥", key="start_button"):
 
     if st.session_state.event is None:
         st.warning("イベントを選択して")
     else:
-
-        vision_context = ""
 
         if video_file is not None and start_time and end_time:
 
@@ -242,18 +227,16 @@ if st.button("🔥 着火　🔥", key="start_button"):
             frames = extract_frames("clip.mp4")
             st.session_state.frames = frames
 
-            st.write(f"抽出フレーム数: {len(frames)}")
-
             if len(frames) > 0:
                 best_frame, vision_context = pick_worst_frame(frames, client)
                 st.session_state.best_frame = best_frame
 
-        # 👇 追加（評価エンジン）
         macro_eval = evaluate_macro_value(st.session_state.event, vision_context)
         lane_eval = evaluate_lane_trade(vision_context)
         diagnosis = diagnose_player(macro_eval, lane_eval)
-        
+
         with st.spinner("考え中..."):
+
             content = build_prompt(
                 lane,
                 f"{start_time}〜{end_time}",
@@ -266,12 +249,6 @@ if st.button("🔥 着火　🔥", key="start_button"):
 【内部評価】
 {macro_eval}
 {lane_eval}
-
-【ルール】
-・数値（点数）は絶対に出すな
-・初心者にもわかる言葉で言え
-・詰問口調で
-・改善案を出せ
 """
 
             response = client.chat.completions.create(
@@ -290,71 +267,7 @@ if st.button("🔥 着火　🔥", key="start_button"):
             "event": st.session_state.event,
             "outputs": outputs,
             "ratings": [None, None, None],
-            "diagnosis": diagnosis  # ← 追加
+            "diagnosis": diagnosis
         })
 
         st.session_state.history = st.session_state.history[-3:]
-
-# =========================
-# 👇 常に表示されるエリア（ここが重要）
-# =========================
-if len(st.session_state.history) > 0:
-
-    last = st.session_state.history[-1]
-    frames = st.session_state.frames
-
-if "best_frame" in st.session_state:
-    st.image(
-        st.session_state.best_frame,
-        caption="🔥 一番ヤバいシーン",
-        use_container_width=True
-    )
-
-    # 👇 診断表示追加
-    if "diagnosis" in last:
-        st.subheader(f"🧠 診断結果：{last['diagnosis']}")
-
-    st.subheader("🧠 プレイ診断")
-    st.error(diagnosis)
-    st.subheader("🔥ちくちく一言🔥")
-
-    for i, text in enumerate(last["outputs"]):
-
-        col_img, col_text = st.columns([1, 2])
-
-        with col_img:
-            if i < len(frames):
-                st.image(frames[i], use_container_width=True)
-
-        with col_text:
-            st.success(text)
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if st.button(
-                f"いいちくちく👍",
-                key=f"good_{len(st.session_state.history)}_{i}"
-            ):
-                if last.get("ratings") is None:
-                    last["ratings"] = [None, None, None]
-                last["ratings"][i] = "good"
-                st.toast(f"{i+1}個目：👍 保存")
-
-        with col2:
-            if st.button(
-                f"よくないちくちく👎",
-                key=f"bad_{len(st.session_state.history)}_{i}"
-            ):
-                if last.get("ratings") is None:
-                    last["ratings"] = [None, None, None]
-                last["ratings"][i] = "bad"
-                st.toast(f"{i+1}個目：👎 保存")
-
-        if last.get("ratings") and last["ratings"][i]:
-            if last["ratings"][i] == "good":
-                st.success("→ 👍 評価済み")
-            else:
-                st.error("→ 👎 評価済み")
-
-        st.divider()
