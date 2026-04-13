@@ -138,3 +138,24 @@ def evaluate_lane_trade(vision_context):
         return "CS取るタイミングでプレッシャーかけれてない"
 
     return "トレード判断が甘い"
+
+def diagnose_player(macro_eval, lane_eval):
+    """
+    プレイヤー診断
+    """
+
+    text = f"{macro_eval} / {lane_eval}"
+
+    if "曖昧" in text:
+        return "受け身すぎ型"
+
+    if "低価値" in text:
+        return "貧乏型"
+
+    if "殴り返してない" in text:
+        return "チキン野郎型"
+
+    if "遅れている" in text:
+        return "鱗滝さんに殴られる型"
+
+    return "ggwp"

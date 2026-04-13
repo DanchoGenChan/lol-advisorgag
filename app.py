@@ -8,6 +8,7 @@ import subprocess
 import cv2
 import os
 import base64  # 👈 追加
+from main import evaluate_macro_value, evaluate_lane_trade, diagnose_player
 
 def extract_frames(video_path, output_dir="frames", interval=3):
     os.makedirs(output_dir, exist_ok=True)
@@ -251,7 +252,7 @@ if st.button("🔥 着火　🔥", key="start_button"):
         macro_eval = evaluate_macro_value(st.session_state.event, vision_context)
         lane_eval = evaluate_lane_trade(vision_context)
         diagnosis = diagnose_player(macro_eval, lane_eval)
-
+        
         with st.spinner("考え中..."):
             content = build_prompt(
                 lane,
@@ -313,6 +314,8 @@ if "best_frame" in st.session_state:
     if "diagnosis" in last:
         st.subheader(f"🧠 診断結果：{last['diagnosis']}")
 
+    st.subheader("🧠 プレイ診断")
+    st.error(diagnosis)
     st.subheader("🔥ちくちく一言🔥")
 
     for i, text in enumerate(last["outputs"]):
