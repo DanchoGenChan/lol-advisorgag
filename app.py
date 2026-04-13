@@ -80,6 +80,49 @@ def analyze_frames_with_gpt(frame_paths, client):
 
     return "\n".join(descriptions)
 
+def pick_worst_frame(frame_paths, client):
+
+    descriptions = []
+
+    for i, path in enumerate(frame_paths[:3]):
+        with open(path, "rb") as f:
+            img_bytes = f.read()
+
+        img_base64 = base64.b64encode(img_bytes).decode()
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": f"""
+これはLoLの試合のフレーム{i}です。
+このシーンのミスの重大度を10点満点で評価し、理由を一言で述べろ。
+
+出力形式:
+score:数字
+reason:一言
+"""},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"}}
+                    ]
+                }
+            ]
+        )
+
+        text = response.choices[0].message.content
+
+        try:
+            score = int(text.split("score:")[1].split("\n")[0])
+        except:
+            score = 0
+
+        descriptions.append((score, path, text))
+
+    worst = max(descriptions, key=lambda x: x[0])
+
+    return worst[1], worst[2]
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 st.set_page_config(page_title="LOLコーチング", layout="centered")
@@ -162,7 +205,8 @@ if st.button("🔥 着火　🔥", key="start_button"):
             st.write(f"抽出フレーム数: {len(frames)}")
 
             if len(frames) > 0:
-                vision_context = analyze_frames_with_gpt(frames, client)
+                best_frame, vision_context = pick_worst_frame(frames, client)
+                st.session_state.best_frame = best_frame
 
         with st.spinner("考え中..."):
             response = client.chat.completions.create(
@@ -205,6 +249,12 @@ if len(st.session_state.history) > 0:
     last = st.session_state.history[-1]
     frames = st.session_state.frames
 
+if "best_frame" in st.session_state:
+    st.image(
+        st.session_state.best_frame,
+        caption="🔥 一番ヤバいシーン",
+        use_container_width=True
+    )
     st.subheader("🔥ちくちく一言🔥")
 
     for i, text in enumerate(last["outputs"]):
