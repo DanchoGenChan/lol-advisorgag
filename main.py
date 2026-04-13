@@ -66,6 +66,8 @@ def build_prompt(lane, time, situation, feedback=None):
 ・一般論
 ・説明口調
 ・丁寧語
+・出力不足
+・1行40字以上の長文
 
 ▼出力（重要）
 3行で出力：
@@ -147,7 +149,7 @@ def diagnose_player(macro_eval, lane_eval):
     text = f"{macro_eval} / {lane_eval}"
 
     if "曖昧" in text:
-        return "思考停止してる"
+        return "思考停止マン"
 
     if "低価値" in text:
         return "一生アイテムそろわない人"
