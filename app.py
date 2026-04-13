@@ -211,17 +211,19 @@ diagnosis = ""
 
 if st.button("🔥 着火　🔥", key="start_button"):
 
-    st.write("① ボタン押下通過")  # ←追加
+    st.write("① ボタン押下通過")
 
     if st.session_state.event is None:
         st.warning("イベントを選択して")
     else:
 
-        st.write("② イベントOK")  # ←追加
+        st.write("② イベントOK")
+
+        vision_context = ""
 
         if video_file is not None and start_time and end_time:
 
-            st.write("③ 動画処理入る")  # ←追加
+            st.write("③ 動画処理入る")
 
             video_bytes = video_file.getvalue()
 
@@ -236,65 +238,42 @@ if st.button("🔥 着火　🔥", key="start_button"):
             if len(frames) > 0:
                 best_frame, vision_context = pick_worst_frame(frames, client)
                 st.session_state.best_frame = best_frame
-                st.write("④ 診断前")  # ←追加
+                st.write("④ 診断前")
 
-
+        # 👇 診断ロジック（ここで1回だけ）
         macro_eval = evaluate_macro_value(st.session_state.event, vision_context)
         lane_eval = evaluate_lane_trade(vision_context)
         diagnosis = diagnose_player(macro_eval, lane_eval)
 
-        st.write("⑤ 診断後")  # ←追加
+        st.write("⑤ 診断後")
 
         with st.spinner("考え中..."):
 
-            macro_eval = evaluate_macro_value(st.session_state.event, vision_context)
-            lane_eval = evaluate_lane_trade(vision_context)
-            diagnosis = diagnose_player(macro_eval, lane_eval)
-
+            # 👇 contentは1回だけ作る（上書き禁止）
             content = build_prompt(
                 lane,
                 f"{start_time}〜{end_time}",
                 st.session_state.event
             ) + f"""
 
-       【画面分析】
-       {vision_context}
+【画面分析】
+{vision_context}
 
-       【内部評価】
-       {macro_eval}
-       {lane_eval}
+【内部評価】
+{macro_eval}
+{lane_eval}
 
-       【診断】
-       {diagnosis}
+【診断】
+{diagnosis}
 
-       【ルール】
-       ・数値（点数）は絶対に出すな
-       ・初心者にもわかる言葉で言え
-       ・詰問口調で
-       ・改善案を出せ
-       """
+【ルール】
+・数値（点数）は絶対に出すな
+・初心者にもわかる言葉で言え
+・詰問口調で
+・改善案を出せ
+"""
 
-            content = build_prompt(
-                 lane,
-                 f"{start_time}〜{end_time}",
-                 st.session_state.event
-            ) + f"""
-            【画面分析】
-            {vision_context}
-
-            【内部評価】
-            {macro_eval}
-            {lane_eval}
-
-            【ルール】
-            ・数値（点数は絶対に出すな）
-            ・初心者にもわかる言葉で言え
-            ・詰問口調で
-            ・改善案を出せ
-            """
-            
-
-            st.write("⑥ API前") # ←追加
+            st.write("⑥ API前")
 
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -303,6 +282,10 @@ if st.button("🔥 着火　🔥", key="start_button"):
 
             st.write("⑦ API後")
 
+            # 👇 これが無かったのが今回のクラッシュ原因
+            raw = response.choices[0].message.content
+
+        # 👇 APIの外で処理
         outputs = [line for line in raw.strip().split("\n") if line.strip()]
         while len(outputs) < 3:
             outputs.append("（出力不足）")
