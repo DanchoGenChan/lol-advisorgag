@@ -211,19 +211,19 @@ diagnosis = ""
 
 if st.button("🔥 着火　🔥", key="start_button"):
 
-    st.write("① ボタン押下通過")
+    
 
     if st.session_state.event is None:
         st.warning("イベントを選択して")
     else:
 
-        st.write("② イベントOK")
+        
 
         vision_context = ""
 
         if video_file is not None and start_time and end_time:
 
-            st.write("③ 動画処理入る")
+            
 
             video_bytes = video_file.getvalue()
 
@@ -238,14 +238,14 @@ if st.button("🔥 着火　🔥", key="start_button"):
             if len(frames) > 0:
                 best_frame, vision_context = pick_worst_frame(frames, client)
                 st.session_state.best_frame = best_frame
-                st.write("④ 診断前")
+                
 
         # 👇 診断ロジック（ここで1回だけ）
         macro_eval = evaluate_macro_value(st.session_state.event, vision_context)
         lane_eval = evaluate_lane_trade(vision_context)
         diagnosis = diagnose_player(macro_eval, lane_eval)
 
-        st.write("⑤ 診断後")
+        
 
         with st.spinner("考え中..."):
 
@@ -273,14 +273,14 @@ if st.button("🔥 着火　🔥", key="start_button"):
 ・改善案を出せ
 """
 
-            st.write("⑥ API前")
+            
 
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": content}]
             )
 
-            st.write("⑦ API後")
+            
 
             # 👇 これが無かったのが今回のクラッシュ原因
             raw = response.choices[0].message.content
@@ -300,7 +300,6 @@ if st.button("🔥 着火　🔥", key="start_button"):
 
         st.session_state.history = st.session_state.history[-3:]
 
-st.write("⑧ レスポンス取得")  # ←追加
 
 # =========================
 # 👇 常に表示されるエリア（修正版）
