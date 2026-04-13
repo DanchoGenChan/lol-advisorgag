@@ -247,7 +247,9 @@ if st.button("🔥 着火　🔥", key="start_button"):
 
         with st.spinner("考え中..."):
 
-            st.write("⑥ API前")  # ←追加
+            macro_eval = evaluate_macro_value(st.session_state.event, vision_context)
+            lane_eval = evaluate_lane_trade(vision_context)
+            diagnosis = diagnose_player(macro_eval, lane_eval)
 
             content = build_prompt(
                 lane,
@@ -255,18 +257,27 @@ if st.button("🔥 着火　🔥", key="start_button"):
                 st.session_state.event
             ) + f"""
 
-【画面分析】
-{vision_context}
+       【画面分析】
+       {vision_context}
 
-【内部評価】
-{macro_eval}
-{lane_eval}
-"""
+       【内部評価】
+       {macro_eval}
+       {lane_eval}
+
+       【診断】
+       {diagnosis}
+
+       【ルール】
+       ・数値（点数）は絶対に出すな
+       ・初心者にもわかる言葉で言え
+       ・詰問口調で
+       ・改善案を出せ
+       """
 
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": content}]
-            )
+             )
 
             st.write("⑦ API後")  # ←追加
 
