@@ -191,25 +191,30 @@ video_file = st.file_uploader(
     type=["mp4", "webm"],
     key="video_uploader"
 )
-if uploaded_file is not None:
 
+if video_file is not None:
+
+    # 👇 一時保存
     with open("temp.mp4", "wb") as f:
-        f.write(uploaded_file.read())
+        f.write(video_file.read())
 
+    # 👇 フレーム抽出
     frames = extract_frames("temp.mp4")
 
+    # 👇 sessionに保存（重要）
     st.session_state.frames = frames
 
+    # 👇 フレームチェック
     if len(frames) == 0:
         st.error("❌ フレーム抽出失敗")
+        st.session_state.best_frame = None
+
     else:
         st.success(f"✅ {len(frames)}枚抽出")
-            # 👇 best_frame安全設定
-        best_frame = None
-        if len(frames) > 0:
-            best_frame = frames[0]
 
-    st.session_state.best_frame = best_frame
+        # 👇 best_frame設定（安全）
+        best_frame = frames[0]
+        st.session_state.best_frame = best_frame
 
 if video_file:
     st.video(video_file)
