@@ -15,13 +15,11 @@ def extract_frames(video_path, output_dir="frames", max_frames=3):
     cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():
-        print("❌ 動画開けない")
         return []
 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     if total_frames == 0:
-        print("❌ フレーム0")
         return []
 
     interval = max(total_frames // max_frames, 1)
@@ -44,13 +42,22 @@ def extract_frames(video_path, output_dir="frames", max_frames=3):
         count += 1
 
     cap.release()
-
-    print(f"✅ 抽出成功: {len(frames)}枚")
     return frames
 
 def trim_video(input_path, start, end, output_path):
-    import shutil
-    shutil.copy(input_path, output_path)
+    import subprocess
+
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i", input_path,
+        "-ss", start,
+        "-to", end,
+        "-c", "copy",
+        output_path
+    ]
+
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def analyze_frames_with_gpt(frame_paths, client):
     descriptions = []
@@ -198,11 +205,6 @@ if video_file is not None:
     with open("temp.mp4", "wb") as f:
         f.write(video_file.read())
 
-    # 👇 フレーム抽出
-    frames = extract_frames("temp.mp4")
-
-    # 👇 sessionに保存（重要）
-    st.session_state.frames = frames
 
     # 👇 フレームチェック
     if len(frames) == 0:
@@ -250,36 +252,32 @@ diagnosis = ""
 
 if st.button("🔥 着火　🔥", key="start_button"):
 
-    
-
     if st.session_state.event is None:
         st.warning("イベントを選択して")
     else:
-
-        
 
         vision_context = ""
 
         if video_file is not None and start_time and end_time:
 
-            
-
-            video_bytes = video_file.getvalue()
-
             with open("input.mp4", "wb") as f:
-                f.write(video_bytes)
+                f.write(video_file.getvalue())
 
+            # ✅ ① 時間切り出し
             trim_video("input.mp4", start_time, end_time, "clip.mp4")
-            st.write("DEBUG: trim_video完了")
 
+            # ✅ ② クリップからのみ抽出
             frames = extract_frames("clip.mp4")
-            st.write("DEBUG frames数:", len(frames))
+
             st.session_state.frames = frames
+
+            st.write("DEBUG frames数:", len(frames))
 
             if len(frames) > 0:
                 best_frame, vision_context = pick_worst_frame(frames, client)
                 st.session_state.best_frame = best_frame
-                st.write("DEBUG: best_frame保存完了")
+            else:
+                st.session_state.best_frame = None
                 
 
         # 👇 診断ロジック（ここで1回だけ）
@@ -382,8 +380,8 @@ if len(history) > 0:
         col_img, col_text = st.columns([1, 2])
 
         with col_img:
-            if i < len(frames):
-                st.image(frames[i], use_container_width=True)
+            if st.session_state.get("best_frame"):
+                st.image(st.session_state.best_frame, use_container_width=True)
 
         with col_text:
             st.success(text)
