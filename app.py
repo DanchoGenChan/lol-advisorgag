@@ -87,43 +87,42 @@ def create_share_image(img_path, comments, diagnosis, output_path="share.png"):
 
     width, height = img.size
 
-    # 半透明黒背景
-    overlay_height = int(height * 0.4)
+    # =========================
+    # 上：診断表示エリア
+    # =========================
+    top_overlay = Image.new("RGBA", (width, 100), (0, 0, 0, 180))
+    img.paste(top_overlay, (0, 0), top_overlay)
+
+    try:
+        font_big = ImageFont.truetype("arial.ttf", 40)
+        font = ImageFont.truetype("arial.ttf", 28)
+    except:
+        font_big = ImageFont.load_default()
+        font = ImageFont.load_default()
+
+    draw.text(
+        (20, 20),
+        f"診断: {diagnosis}",
+        fill=(255, 255, 255),
+        font=font_big
+    )
+
+    # =========================
+    # 下：コメントエリア
+    # =========================
+    overlay_height = int(height * 0.35)
     overlay = Image.new("RGBA", (width, overlay_height), (0, 0, 0, 180))
     img.paste(overlay, (0, height - overlay_height), overlay)
 
-    draw = ImageDraw.Draw(img)
-
-    # フォント
-    try:
-        title_font = ImageFont.truetype("arial.ttf", 40)
-        font = ImageFont.truetype("arial.ttf", 32)
-    except:
-        title_font = ImageFont.load_default()
-        font = ImageFont.load_default()
-
-    # 👇 診断テキスト
-    diagnosis_text = f"🧠 {diagnosis}"
-
-    # 👇 コメント
-    comment_text = "\n".join([
+    text = "\n".join([
         f"① {comments[0]}",
         f"② {comments[1]}",
         f"③ {comments[2]}"
     ])
 
-    # 👇 描画（診断）
-    draw.text(
-        (20, height - overlay_height + 10),
-        diagnosis_text,
-        fill=(255, 100, 100),
-        font=title_font
-    )
-
-    # 👇 描画（コメント）
     draw.multiline_text(
-        (20, height - overlay_height + 60),
-        comment_text,
+        (20, height - overlay_height + 20),
+        text,
         fill=(255, 255, 255),
         font=font,
         spacing=10
