@@ -186,7 +186,8 @@ if st.button("🔥 着火"):
         f.write(video_file.getvalue())
 
     # ✅ 時間切り出し
-    trim_video("input.mp4", start_time, end_time, "clip.mp4")
+    #trim_video("input.mp4", start_time, end_time, "clip.mp4")
+
 
     # ✅ 抽出（ここが今回の本質）
     frames = extract_frames("clip.mp4")
