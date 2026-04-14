@@ -249,11 +249,13 @@ if st.button("🔥 着火　🔥", key="start_button"):
             trim_video("input.mp4", start_time, end_time, "clip.mp4")
 
             frames = extract_frames("clip.mp4")
+            st.write("DEBUG frames数:", len(frames))
             st.session_state.frames = frames
 
             if len(frames) > 0:
                 best_frame, vision_context = pick_worst_frame(frames, client)
                 st.session_state.best_frame = best_frame
+                st.write("DEBUG: best_frame保存完了")
                 
 
         # 👇 診断ロジック（ここで1回だけ）
