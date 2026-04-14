@@ -9,46 +9,37 @@ import cv2
 import os
 import base64
 
-def extract_frames(video_path, output_dir="frames", interval=3):
-    os.makedirs(output_dir, exist_ok=True)
+def extract_frames(video_path):
+    frames = []
 
     cap = cv2.VideoCapture(video_path)
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    count = 0
-    saved = []
 
-    while cap.isOpened():
+    if not cap.isOpened():
+        print("❌ 動画開けない")
+        return frames
+
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print("DEBUG: 総フレーム数 =", total)
+
+    # 👉 最大10枚だけ取る（軽量化＆安定）
+    step = max(total // 10, 1)
+
+    idx = 0
+    while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        if fps == 0:
-            break
+        if idx % step == 0:
+            frames.append(frame)
 
-        if count % (fps * interval) == 0:
-            sec = int(count / fps)
-            timestamp = f"{sec//60:02d}:{sec%60:02d}"
-
-            path = f"{output_dir}/frame_{count}_{timestamp}.jpg"
-
-            cv2.putText(
-                frame,
-                f"{timestamp}",
-                (30, 50),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 255, 0),
-                2,
-                cv2.LINE_AA
-            )
-
-            cv2.imwrite(path, frame)
-            saved.append(path)
-
-        count += 1
+        idx += 1
 
     cap.release()
-    return saved
+
+    print("DEBUG: 抽出フレーム数 =", len(frames))
+
+    return frames
 
 def trim_video(input_path, start, end, output_path):
     import shutil
@@ -247,6 +238,7 @@ if st.button("🔥 着火　🔥", key="start_button"):
                 f.write(video_bytes)
 
             trim_video("input.mp4", start_time, end_time, "clip.mp4")
+            st.write("DEBUG: trim_video完了")
 
             frames = extract_frames("clip.mp4")
             st.write("DEBUG frames数:", len(frames))
@@ -320,29 +312,59 @@ if st.button("🔥 着火　🔥", key="start_button"):
 
 
 # =========================
-# 👇 常に表示されるエリア（完全版）
+# 👇 常に表示されるエリア（完全修正版）
 # =========================
 if len(st.session_state.history) > 0:
-    st.write("DEBUG:", st.session_state.keys())
 
     last = st.session_state.history[-1]
-    frames = st.session_state.frames
 
-    # 👇 ベストフレーム
-    
-    if True:
+    frames = extract_frames("clip.mp4")
+    st.write("DEBUG frames数:", len(frames))
+
+    st.session_state.frames = frames
+
+    vision_context = "取得失敗"
+
+    # =========================
+    # 👇 ベストフレーム表示（安全版）
+    # =========================
+    if len(frames) > 0:
+
+        st.write("DEBUG: フレームあり → best_frame生成")
+        
+        try:
+            best_frame, vision_context = pick_worst_frame(frames, client)
+            st.session_state.best_frame = best_frame
+            st.write("DEBUG: best_frame保存成功")
+
+        except Exception as e:
+           st.error(f"❌ best_frame生成失敗: {e}")
+           st.session_state.best_frame = frames[0]
+
+    else:
+        st.warning("⚠️ フレームが0枚 → 動画処理失敗")
+        st.session_state.best_frame = None
+
+    if best_frame is not None:
         st.image(
-            st.session_state.best_frame,
+            best_frame,
             caption="🔥 一番ヤバいシーン",
             use_container_width=True
         )
+    else:
+        st.warning("⚠️ フレーム取得できてない（動画処理を確認しろ）")
 
+    # =========================
     # 👇 診断
+    # =========================
     if "diagnosis" in last:
         st.subheader(f"🧠 診断結果：{last['diagnosis']}")
 
     st.subheader("🔥ちくちく一言🔥")
 
+    # =========================
+    # 👇 コメント表示 + 評価
+    # =========================
     for i, text in enumerate(last["outputs"]):
 
         col_img, col_text = st.columns([1, 2])
@@ -390,9 +412,9 @@ if len(st.session_state.history) > 0:
         st.toast("コピーして使え")
 
     # =========================
-    # 👇 画像生成（ここ重要）
+    # 👇 画像生成（完全安全版）
     # =========================
-    if "best_frame" in st.session_state:
+    if best_frame is not None:
 
         if st.button("📸 シェア画像を作成"):
             st.session_state.make_img = True
@@ -400,9 +422,9 @@ if len(st.session_state.history) > 0:
         if st.session_state.get("make_img"):
 
             share_img = create_share_image(
-                st.session_state.best_frame,
+                best_frame,
                 last["outputs"],
-                last["diagnosis"]
+                last.get("diagnosis", "診断なし")
             )
 
             with open(share_img, "rb") as f:
@@ -413,13 +435,15 @@ if len(st.session_state.history) > 0:
                 )
 
     # =========================
-    # 👇 Xシェア
+    # 👇 シェア
     # =========================
+    import urllib.parse
+
     url_link = "https://lol-coaching-chiku-chiku-ai.streamlit.app/"
 
     share_text = f"""ちくちくAIからのフィードバック
 
-{last['diagnosis']}
+{last.get('diagnosis', '')}
 
 {last['outputs'][0]}
 {last['outputs'][1]}
