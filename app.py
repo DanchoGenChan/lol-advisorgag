@@ -9,36 +9,43 @@ import cv2
 import os
 import base64
 
-def extract_frames(video_path):
-    frames = []
+def extract_frames(video_path, output_dir="frames", max_frames=3):
+    os.makedirs(output_dir, exist_ok=True)
 
     cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():
         print("❌ 動画開けない")
-        return frames
+        return []
 
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    print("DEBUG: 総フレーム数 =", total)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    # 👉 最大10枚だけ取る（軽量化＆安定）
-    step = max(total // 10, 1)
+    if total_frames == 0:
+        print("❌ フレーム0")
+        return []
 
-    idx = 0
-    while True:
+    interval = max(total_frames // max_frames, 1)
+
+    frames = []
+    count = 0
+    saved = 0
+
+    while cap.isOpened() and saved < max_frames:
         ret, frame = cap.read()
         if not ret:
             break
 
-        if idx % step == 0:
-            frames.append(frame)
+        if count % interval == 0:
+            frame_path = os.path.join(output_dir, f"frame_{saved}.png")
+            cv2.imwrite(frame_path, frame)
+            frames.append(frame_path)
+            saved += 1
 
-        idx += 1
+        count += 1
 
     cap.release()
 
-    print("DEBUG: 抽出フレーム数 =", len(frames))
-
+    print(f"✅ 抽出成功: {len(frames)}枚")
     return frames
 
 def trim_video(input_path, start, end, output_path):
@@ -184,6 +191,26 @@ video_file = st.file_uploader(
     type=["mp4", "webm"],
     key="video_uploader"
 )
+if uploaded_file is not None:
+
+    with open("temp.mp4", "wb") as f:
+        f.write(uploaded_file.read())
+
+    frames = extract_frames("temp.mp4")
+
+    st.session_state.frames = frames
+
+    if len(frames) == 0:
+        st.error("❌ フレーム抽出失敗")
+    else:
+        st.success(f"✅ {len(frames)}枚抽出")
+            # 👇 best_frame安全設定
+        best_frame = None
+        if len(frames) > 0:
+            best_frame = frames[0]
+
+    st.session_state.best_frame = best_frame
+
 if video_file:
     st.video(video_file)
 
@@ -312,50 +339,30 @@ if st.button("🔥 着火　🔥", key="start_button"):
 
 
 # =========================
-# 👇 常に表示されるエリア（完全修正版）
+# 👇 共有・画像・シェアエリア（完全版）
 # =========================
-if len(st.session_state.history) > 0:
 
-    last = st.session_state.history[-1]
+# 安全取得（ここ超重要）
+best_frame = st.session_state.get("best_frame", None)
+frames = st.session_state.get("frames", [])
+history = st.session_state.get("history", [])
 
-    frames = extract_frames("clip.mp4")
-    st.write("DEBUG frames数:", len(frames))
+if len(history) > 0:
 
-    st.session_state.frames = frames
-
-    vision_context = "取得失敗"
+    last = history[-1]
 
     # =========================
-    # 👇 ベストフレーム表示（安全版）
+    # 👇 ベストフレーム表示
     # =========================
-    if len(frames) > 0:
-
-        st.write("DEBUG: フレームあり → best_frame生成")
-        
-        try:
-            best_frame, vision_context = pick_worst_frame(frames, client)
-            st.session_state.best_frame = best_frame
-            st.write("DEBUG: best_frame保存成功")
-
-        except Exception as e:
-           st.error(f"❌ best_frame生成失敗: {e}")
-           st.session_state.best_frame = frames[0]
-
-    else:
-        st.warning("⚠️ フレームが0枚 → 動画処理失敗")
-        st.session_state.best_frame = None
-
-    if best_frame is not None:
+    if st.session_state.get("best_frame") is not None:
         st.image(
-            best_frame,
+            st.session_state.best_frame,
             caption="🔥 一番ヤバいシーン",
             use_container_width=True
         )
-    else:
-        st.warning("⚠️ フレーム取得できてない（動画処理を確認しろ）")
 
     # =========================
-    # 👇 診断
+    # 👇 診断表示
     # =========================
     if "diagnosis" in last:
         st.subheader(f"🧠 診断結果：{last['diagnosis']}")
@@ -363,7 +370,7 @@ if len(st.session_state.history) > 0:
     st.subheader("🔥ちくちく一言🔥")
 
     # =========================
-    # 👇 コメント表示 + 評価
+    # 👇 コメント＋評価UI
     # =========================
     for i, text in enumerate(last["outputs"]):
 
@@ -381,7 +388,7 @@ if len(st.session_state.history) > 0:
         with col1:
             if st.button(
                 f"いいちくちく👍",
-                key=f"good_{len(st.session_state.history)}_{i}"
+                key=f"good_{len(history)}_{i}"
             ):
                 last["ratings"][i] = "good"
                 st.toast(f"{i+1}個目：👍 保存")
@@ -389,7 +396,7 @@ if len(st.session_state.history) > 0:
         with col2:
             if st.button(
                 f"よくないちくちく👎",
-                key=f"bad_{len(st.session_state.history)}_{i}"
+                key=f"bad_{len(history)}_{i}"
             ):
                 last["ratings"][i] = "bad"
                 st.toast(f"{i+1}個目：👎 保存")
@@ -412,14 +419,11 @@ if len(st.session_state.history) > 0:
         st.toast("コピーして使え")
 
     # =========================
-    # 👇 画像生成（完全安全版）
+    # 👇 画像生成（診断入り）
     # =========================
     if best_frame is not None:
 
         if st.button("📸 シェア画像を作成"):
-            st.session_state.make_img = True
-
-        if st.session_state.get("make_img"):
 
             share_img = create_share_image(
                 best_frame,
@@ -435,16 +439,16 @@ if len(st.session_state.history) > 0:
                 )
 
     # =========================
-    # 👇 シェア
+    # 👇 Xシェア
     # =========================
-    import urllib.parse
-
     url_link = "https://lol-coaching-chiku-chiku-ai.streamlit.app/"
 
     share_text = f"""ちくちくAIからのフィードバック
 
-{last.get('diagnosis', '')}
+【診断】
+{last.get("diagnosis", "")}
 
+【ちくちく】
 {last['outputs'][0]}
 {last['outputs'][1]}
 {last['outputs'][2]}
