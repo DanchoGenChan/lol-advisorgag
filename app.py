@@ -321,12 +321,14 @@ if st.button("🔥 着火　🔥", key="start_button"):
 # 👇 常に表示されるエリア（完全版）
 # =========================
 if len(st.session_state.history) > 0:
+    st.write("DEBUG:", st.session_state.keys())
 
     last = st.session_state.history[-1]
     frames = st.session_state.frames
 
     # 👇 ベストフレーム
-    if "best_frame" in st.session_state:
+    
+    if True:
         st.image(
             st.session_state.best_frame,
             caption="🔥 一番ヤバいシーン",
@@ -391,6 +393,9 @@ if len(st.session_state.history) > 0:
     if "best_frame" in st.session_state:
 
         if st.button("📸 シェア画像を作成"):
+            st.session_state.make_img = True
+
+        if st.session_state.get("make_img"):
 
             share_img = create_share_image(
                 st.session_state.best_frame,
