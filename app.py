@@ -318,14 +318,14 @@ if st.button("🔥 着火　🔥", key="start_button"):
 
 
 # =========================
-# 👇 常に表示されるエリア（修正版）
+# 👇 常に表示されるエリア（完全版）
 # =========================
 if len(st.session_state.history) > 0:
 
     last = st.session_state.history[-1]
     frames = st.session_state.frames
 
-    # 👇 best_frameなくても動くようにする
+    # 👇 ベストフレーム
     if "best_frame" in st.session_state:
         st.image(
             st.session_state.best_frame,
@@ -376,7 +376,9 @@ if len(st.session_state.history) > 0:
 
         st.divider()
 
-    # 👇 コピー用
+    # =========================
+    # 👇 コピー
+    # =========================
     combined = "\n".join(last["outputs"])
     st.code(combined)
 
@@ -384,11 +386,9 @@ if len(st.session_state.history) > 0:
         st.toast("コピーして使え")
 
     # =========================
-    # 👇 画像生成＆ダウンロード
+    # 👇 画像生成（ここ重要）
     # =========================
     if "best_frame" in st.session_state:
-
-        st.info("👇 画像を保存してツイートに貼れ")
 
         if st.button("📸 シェア画像を作成"):
 
@@ -406,13 +406,13 @@ if len(st.session_state.history) > 0:
                 )
 
     # =========================
-    # 👇 シェア
+    # 👇 Xシェア
     # =========================
     url_link = "https://lol-coaching-chiku-chiku-ai.streamlit.app/"
 
     share_text = f"""ちくちくAIからのフィードバック
 
-🧠 診断：{last['diagnosis']}
+{last['diagnosis']}
 
 {last['outputs'][0]}
 {last['outputs'][1]}
