@@ -1,7 +1,19 @@
-import random
+def normalize_outputs(raw_text: str):
+    lines = [line.strip() for line in (raw_text or "").splitlines() if line.strip()]
 
-def build_prompt(lane, time, situation, feedback=None):
+    if len(lines) >= 3:
+        return lines[:3]
 
+    fallback = [
+        "画面情報が薄い、判断ミスが特定しきれてない",
+        "HPと人数差を先に見ろ、なんでノールックで入った？",
+        "次はちゃんと見てから動け",
+    ]
+    lines.extend(fallback[len(lines):])
+    return lines[:3]
+
+
+def build_prompt(lane, time, situation, feedback=None, vision_context=""):
     macro_rules = """
 【マクロ評価ルール】
 
@@ -30,19 +42,21 @@ def build_prompt(lane, time, situation, feedback=None):
 """
 
     feedback_text = ""
-
     if feedback:
         good = feedback.get("good", 0)
+        bad = feedback.get("bad", 0)
         total = feedback.get("total", 0)
 
         if total > 0:
             feedback_text = f"""
 過去の評価傾向:
-- good率: {good}/{total}
+- good: {good}
+- bad: {bad}
+- total: {total}
 
 指示:
-- goodが多い → 今のスタイル維持
-- badがある → もっと自然で辛口に
+- good > bad: 今の厳しさを維持
+- bad >= good: 指摘をより具体化し、改善手順を短く明確に
 """
 
     style_rules = """
@@ -77,11 +91,6 @@ def build_prompt(lane, time, situation, feedback=None):
 1行目：ミスの指摘（何がダメか）
 2行目：改善＋詰問（どうすべきだったか＋なんでやらない？）
 3行目：雑な応援（少し呆れつつ一言）
-
-▼例のニュアンス（コピペ禁止）
-・「そのHPで前出るの普通に意味わからん」
-・「ウェーブ見てから動けよ、なんで突っ込んだ？」
-・「これから上手くなるといいね」
 """
 
     return f"""
@@ -97,6 +106,9 @@ def build_prompt(lane, time, situation, feedback=None):
 - レーン: {lane}
 - 時間: {time}
 - 出来事: {situation}
+
+画面分析:
+{vision_context if vision_context else "情報不足"}
 
 この状況を見て、上のルールに従って3行でコメントしろ。
 
@@ -114,51 +126,39 @@ def build_prompt(lane, time, situation, feedback=None):
 
 
 def evaluate_macro_value(event, vision_context):
-    """
-    オブジェクト価値ベースで判断する
-    """
+    text = vision_context or ""
 
-    values = {
-        "nexus": 100,
-        "elder": 90,
-        "baron": 70,
-        "soul": 75,
-        "dragon": 15,
-        "mid_tower": 50,
-        "side_tower": 20,
-        "herald": 35,
-        "voidgrub": 10
-    }
+    if any(k in text for k in ["人数不利", "人数差-1", "人数差-2"]):
+        return "人数不利でオブジェクト判断が遅い"
 
-    # 超簡易ロジック（あとで強化可能）
-    if "ドラゴン" in vision_context:
-        return "ドラゴンの価値を無視している"
-    if "バロン" in vision_context:
-        return "バロンへの対応が遅れている"
-    if "タワー" in vision_context:
-        return "低価値オブジェクトに固執している"
+    if "バロン" in text and any(k in text for k in ["視界なし", "ノーワード", "暗い川"]):
+        return "バロン周辺の視界管理が甘い"
+
+    if "ドラゴン" in text and any(k in text for k in ["レーン押し負け", "ウェーブ不利"]):
+        return "ドラゴン前のレーン準備が不足"
+
+    if any(k in text for k in ["タワー前で孤立", "サイド深追い"]):
+        return "低価値行動でリスクを背負っている"
 
     return "オブジェクト価値の判断が曖昧"
 
 
 def evaluate_lane_trade(vision_context):
-    """
-    レーン戦ロジック
-    """
+    text = vision_context or ""
 
-    if "HP差" in vision_context and "負け" in vision_context:
-        return "ダメトレ負けてるのに殴り返してない"
+    if any(k in text for k in ["HP不利", "HP差不利"]):
+        return "HP不利なのにトレード継続している"
 
-    if "CS" in vision_context:
-        return "CS取るタイミングでプレッシャーかけれてない"
+    if any(k in text for k in ["ミニオン不利", "敵ウェーブ大"]):
+        return "ミニオン状況を無視して仕掛けている"
+
+    if any(k in text for k in ["スキル落ち", "サモスペ無し", "CD中"]):
+        return "重要CD中の判断が雑"
 
     return "トレード判断が甘い"
 
-def diagnose_player(macro_eval, lane_eval):
-    """
-    プレイヤー診断
-    """
 
+def diagnose_player(macro_eval, lane_eval):
     text = f"{macro_eval} / {lane_eval}"
 
     if "曖昧" in text:
@@ -167,10 +167,10 @@ def diagnose_player(macro_eval, lane_eval):
     if "低価値" in text:
         return "一生アイテムそろわない人"
 
-    if "殴り返してない" in text:
-        return "チキン野郎"
+    if "HP不利" in text:
+        return "チキンでもなく無謀でもある"
 
-    if "遅れている" in text:
-        return "鱗滝さんに殴られる"
+    if "遅い" in text or "不足" in text:
+        return "準備不足ファイター"
 
     return "ggwp"
