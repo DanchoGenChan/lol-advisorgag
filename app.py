@@ -196,7 +196,7 @@ if st.button("🔥 着火　🔥", key="start_button"):
          "start_time:", start_time,
          "end_time:", end_time)
     
-    if video_file is not None and start_time and end_time:
+    if video_file is not None:
 
         with open("input.mp4", "wb") as f:
             f.write(video_file.getvalue())
