@@ -4,74 +4,71 @@ import os
 from openai import OpenAI
 from main import build_prompt, evaluate_macro_value, evaluate_lane_trade, diagnose_player
 import urllib.parse
-import subprocess
 import cv2
 import base64
 
 # =========================
-# 🎯 時間文字列 → 秒
+# 🔥 時間変換関数（追加）
 # =========================
 def time_to_seconds(t):
-    try:
-        parts = list(map(int, t.split(":")))
-        if len(parts) == 3:
-            return parts[0]*3600 + parts[1]*60 + parts[2]
-        elif len(parts) == 2:
-            return parts[0]*60 + parts[1]
-    except:
-        return 0
-    return 0
+    parts = t.split(":")
+    if len(parts) == 3:
+        h, m, s = parts
+        return int(h)*3600 + int(m)*60 + int(s)
+    elif len(parts) == 2:
+        m, s = parts
+        return int(m)*60 + int(s)
+    else:
+        return int(parts[0])
 
 # =========================
-# 🎯 動画トリミング（完全版）
+# 🔥 フレーム抽出（完全置き換え）
 # =========================
-def trim_video(input_path, start, end, output_path):
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-i", input_path,
-        "-ss", start,
-        "-to", end,
-        "-c", "copy",
-        output_path
-    ]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-# =========================
-# 🎯 フレーム抽出（時間範囲前提）
-# =========================
-def extract_frames(video_path, output_dir="frames", max_frames=3):
+def extract_frames(video_path, start_sec=None, end_sec=None, output_dir="frames", max_frames=3):
     os.makedirs(output_dir, exist_ok=True)
 
     cap = cv2.VideoCapture(video_path)
+
     if not cap.isOpened():
+        print("❌ 動画開けない")
         return []
 
+    fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    if total_frames == 0:
-        return []
 
-    interval = max(total_frames // max_frames, 1)
+    start_frame = int(start_sec * fps) if start_sec else 0
+    end_frame = int(end_sec * fps) if end_sec else total_frames
+
+    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+
+    interval = max((end_frame - start_frame) // max_frames, 1)
 
     frames = []
-    count = 0
+    count = start_frame
     saved = 0
 
-    while cap.isOpened() and saved < max_frames:
+    while cap.isOpened() and count < end_frame and saved < max_frames:
         ret, frame = cap.read()
         if not ret:
             break
 
-        if count % interval == 0:
-            path = os.path.join(output_dir, f"frame_{saved}.png")
-            cv2.imwrite(path, frame)
-            frames.append(path)
+        if (count - start_frame) % interval == 0:
+            frame_path = os.path.join(output_dir, f"frame_{saved}.png")
+            cv2.imwrite(frame_path, frame)
+            frames.append(frame_path)
             saved += 1
 
         count += 1
 
     cap.release()
+    print(f"✅ 抽出成功: {len(frames)}枚")
     return frames
+
+# =========================
+# 他の関数はそのまま
+# =========================
+
+
 
 # =========================
 # 🎯 最悪フレーム選定
@@ -156,70 +153,63 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 st.set_page_config(page_title="LOLコーチング", layout="centered")
 st.title("🔥 ちくちくコーチングAI 🔥")
 
+if "event" not in st.session_state:
+    st.session_state.event = None
 if "history" not in st.session_state:
     st.session_state.history = []
-if "best_frame" not in st.session_state:
-    st.session_state.best_frame = None
+if "frames" not in st.session_state:
+    st.session_state.frames = []
 
-video_file = st.file_uploader("動画アップロード", type=["mp4","webm"])
+video_file = st.file_uploader(
+    "動画ファイルをアップロード",
+    type=["mp4", "webm"],
+    key="video_uploader"
+)
+
+if video_file is not None:
+    with open("temp.mp4", "wb") as f:
+        f.write(video_file.read())
 
 if video_file:
     st.video(video_file)
 
-st.subheader("⏱ シーン指定")
-start_time = st.text_input("開始時間", "00:00:05")
-end_time = st.text_input("終了時間", "00:00:10")
+st.divider()
 
-lane = st.selectbox("レーン", ["top","jg","mid","adc","sup"])
-event = st.radio("イベント", ["トレードした","デスした","ガンクされた","キルした","集団戦した"])
+start_time = st.text_input("開始時間 (例: 00:01:40)")
+end_time = st.text_input("終了時間 (例: 00:01:55)")
 
-# =========================
-# 実行
-# =========================
-if st.button("🔥 着火"):
+lane = st.selectbox("レーン", ["top", "jg", "mid", "adc", "sup"])
 
-    if not video_file:
-        st.error("動画なし")
-        st.stop()
+event = st.radio(
+    "イベントを選択",
+    ["トレードした", "デスした", "ガンクされた", "キルした", "集団戦した"]
+)
 
-    with open("input.mp4", "wb") as f:
-        f.write(video_file.getvalue())
+st.session_state.event = event
 
-    # ✅ 時間切り出し
-    #trim_video("input.mp4", start_time, end_time, "clip.mp4")
+if st.button("🔥 着火　🔥"):
 
+    if video_file is not None and start_time and end_time:
 
-    # ✅ 抽出（ここが今回の本質）
-    frames = extract_frames("clip.mp4")
+        with open("input.mp4", "wb") as f:
+            f.write(video_file.getvalue())
 
-    if len(frames) == 0:
-        st.error("フレーム抽出失敗")
-        st.stop()
+        # 🔥 時間変換
+        start_sec = time_to_seconds(start_time)
+        end_sec = time_to_seconds(end_time)
 
-    # ✅ 最悪シーン取得
-    best_frame, vision_context = pick_worst_frame(frames, client)
-    st.session_state.best_frame = best_frame
+        # 🔥 フレーム抽出
+        frames = extract_frames(
+            "input.mp4",
+            start_sec=start_sec,
+            end_sec=end_sec
+        )
 
-    # =========================
-    # GPT生成
-    # =========================
-    content = build_prompt(lane, f"{start_time}〜{end_time}", event)
+        st.session_state.frames = frames
 
-    res = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role":"user","content":content}]
-    )
-
-    raw = res.choices[0].message.content
-
-    outputs = [l for l in raw.split("\n") if l.strip()]
-    while len(outputs) < 3:
-        outputs.append("（出力不足）")
-
-    st.session_state.history.append({
-        "outputs": outputs[:3],
-        "diagnosis": "思考停止マン"
-    })
+        if len(frames) > 0:
+            best_frame = frames[0]
+            st.session_state.best_frame = best_frame
 
 # =========================
 # 表示
