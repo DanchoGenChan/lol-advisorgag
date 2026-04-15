@@ -375,9 +375,23 @@ if st.button("🔥 着火　🔥", key="start_button"):
             # 👇 これが無かったのが今回のクラッシュ原因
             raw = response.choices[0].message.content
 
-        # 👇 APIの外で処理
+        # 👇 APIレスポンス取得（ここが重要）
+        outputs = []
+
+        try:
+           raw = response.choices[0].message.content
+           outputs = [line for line in raw.strip().split("\n") if line.strip()]
+        except Exception as e:
+            print("GPTエラー:", e)
+            outputs = []
+
+        # 👇 フォールバック
         if len(outputs) < 3:
-           outputs = ["出力失敗", "プロンプト崩壊してる", "修正しろ"]
+            outputs = [
+                "出力失敗",
+                "GPTの応答がおかしい",
+                "プロンプト見直せ"
+            ]
 
         st.session_state.history.append({
             "event": st.session_state.event,
