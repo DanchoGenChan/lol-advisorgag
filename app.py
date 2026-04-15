@@ -110,6 +110,24 @@ def trim_video(input_path, start, end, output_path):
         out.release()
 
 
+def extract_frames_from_input_range(video_bytes, start_time, end_time, max_frames=3):
+    """
+    start/end が両方ある場合は範囲抽出、無ければ全体抽出にフォールバックする。
+    """
+    with open("input.mp4", "wb") as f:
+        f.write(video_bytes)
+
+    use_range = bool(start_time and end_time)
+    target_path = "input.mp4"
+
+    if use_range:
+        trim_video("input.mp4", start_time, end_time, "clip.mp4")
+        target_path = "clip.mp4"
+
+    frames = extract_frames(target_path, max_frames=max_frames)
+    return frames, use_range
+
+
 def build_feedback_from_history(history):
     good = 0
     bad = 0
@@ -288,19 +306,29 @@ if st.button("🔥 着火　🔥", key="start_button"):
         vision_context = ""
         worst_reason = ""
 
-        if video_file is not None and start_time and end_time:
+        if video_file is not None:
             try:
                 video_bytes = video_file.getvalue()
-                with open("input.mp4", "wb") as f:
-                    f.write(video_bytes)
-
-                trim_video("input.mp4", start_time, end_time, "clip.mp4")
-                frames = extract_frames("clip.mp4")
+                frames, used_range = extract_frames_from_input_range(
+                    video_bytes=video_bytes,
+                    start_time=start_time,
+                    end_time=end_time,
+                    max_frames=3,
+                )
                 st.session_state.frames = frames
+
+                if start_time and not end_time:
+                    st.warning("終了時間が未入力のため、動画全体から抽出した")
+                elif end_time and not start_time:
+                    st.warning("開始時間が未入力のため、動画全体から抽出した")
+                elif used_range:
+                    st.success("指定範囲からフレーム抽出した")
 
                 if len(frames) > 0:
                     best_frame, vision_context, worst_reason = pick_worst_frame_and_context(frames, client)
                     st.session_state.best_frame = best_frame
+                else:
+                    st.error("フレーム抽出に失敗した")
             except Exception as e:
                 st.error(f"動画処理エラー: {e}")
 
