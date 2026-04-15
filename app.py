@@ -8,6 +8,10 @@ import subprocess
 import cv2
 import os
 import base64
+import textwrap
+
+def wrap_text(text, width=18):
+    return "\n".join(textwrap.wrap(text, width=width))
 
 def extract_frames(video_path, output_dir="frames", max_frames=3):
     os.makedirs(output_dir, exist_ok=True)
@@ -49,8 +53,52 @@ def extract_frames(video_path, output_dir="frames", max_frames=3):
     return frames
 
 def trim_video(input_path, start, end, output_path):
-    import shutil
-    shutil.copy(input_path, output_path)
+    import cv2
+
+    def time_to_sec(t):
+        parts = t.split(":")
+        if len(parts) == 3:
+            h, m, s = parts
+            return int(h)*3600 + int(m)*60 + float(s)
+        elif len(parts) == 2:
+            m, s = parts
+            return int(m)*60 + float(s)
+        return float(t)
+
+    start_sec = time_to_sec(start)
+    end_sec = time_to_sec(end)
+
+    cap = cv2.VideoCapture(input_path)
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    start_frame = int(start_sec * fps)
+    end_frame = int(end_sec * fps)
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = None
+
+    current = 0
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        if current == start_frame:
+            h, w, _ = frame.shape
+            out = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+
+        if start_frame <= current <= end_frame:
+            out.write(frame)
+
+        if current > end_frame:
+            break
+
+        current += 1
+
+    cap.release()
+    if out:
+        out.release()
 
 def analyze_frames_with_gpt(frame_paths, client):
     descriptions = []
@@ -113,9 +161,9 @@ def create_share_image(img_path, comments, diagnosis, output_path="share.png"):
     img.paste(overlay, (0, height - overlay_height), overlay)
 
     text = "\n".join([
-        f"① {comments[0]}",
-        f"② {comments[1]}",
-        f"③ {comments[2]}"
+        f"① {wrap_text(comments[0])}",
+        f"② {wrap_text(comments[1])}",
+        f"③ {wrap_text(comments[2])}"
     ])
 
     draw.multiline_text(
@@ -328,10 +376,8 @@ if st.button("🔥 着火　🔥", key="start_button"):
             raw = response.choices[0].message.content
 
         # 👇 APIの外で処理
-        outputs = [line for line in raw.strip().split("\n") if line.strip()]
-        while len(outputs) < 3:
-            outputs.append("（出力不足）")
-        outputs = outputs[:3]
+        if len(outputs) < 3:
+           outputs = ["出力失敗", "プロンプト崩壊してる", "修正しろ"]
 
         st.session_state.history.append({
             "event": st.session_state.event,
