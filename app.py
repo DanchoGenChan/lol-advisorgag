@@ -187,8 +187,15 @@ event = st.radio(
 
 st.session_state.event = event
 
-if st.button("🔥 着火　🔥"):
+if st.button("🔥 着火　🔥", key="start_button"):
+    st.write("DEBUG: ボタン押された")
 
+
+    st.write("DEBUG:",
+         "video_file:", video_file is not None,
+         "start_time:", start_time,
+         "end_time:", end_time)
+    
     if video_file is not None and start_time and end_time:
 
         with open("input.mp4", "wb") as f:
@@ -198,12 +205,15 @@ if st.button("🔥 着火　🔥"):
         start_sec = time_to_seconds(start_time)
         end_sec = time_to_seconds(end_time)
 
+
+        st.write("DEBUG start_sec:", start_sec, "end_sec:", end_sec)
         # 🔥 フレーム抽出
         frames = extract_frames(
             "input.mp4",
             start_sec=start_sec,
             end_sec=end_sec
         )
+        st.write("DEBUG frames:", len(frames))
 
         st.session_state.frames = frames
 
