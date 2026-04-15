@@ -220,6 +220,20 @@ if st.button("🔥 着火　🔥", key="start_button"):
         if len(frames) > 0:
             best_frame = frames[0]
             st.session_state.best_frame = best_frame
+            if len(frames) > 0:
+                try:
+                    st.write("DEBUG: GPT解析開始")
+
+                    best_frame, vision_context = pick_worst_frame(frames, client)
+
+                    st.write("DEBUG: GPT解析成功")
+                    st.write("DEBUG vision:", vision_context[:100])
+
+                    st.session_state.best_frame = best_frame
+
+                except Exception as e:
+                    st.error(f"❌ GPTエラー: {e}")
+                    st.stop()
 
 # =========================
 # 表示
