@@ -6,6 +6,7 @@ from main import build_prompt, evaluate_macro_value, evaluate_lane_trade, diagno
 import urllib.parse
 import cv2
 import base64
+import re  # 🔥 追加
 
 # =========================
 # 🔥 時間変換関数（追加）
@@ -36,8 +37,8 @@ def extract_frames(video_path, start_sec=None, end_sec=None, output_dir="frames"
     fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    start_frame = int(start_sec * fps) if start_sec else 0
-    end_frame = int(end_sec * fps) if end_sec else total_frames
+    start_frame = int(start_sec * fps) if start_sec is not None else 0  # 🔥 修正
+    end_frame = int(end_sec * fps) if end_sec is not None else total_frames  # 🔥 修正
 
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 
@@ -68,8 +69,6 @@ def extract_frames(video_path, start_sec=None, end_sec=None, output_dir="frames"
 # 他の関数はそのまま
 # =========================
 
-
-
 # =========================
 # 🎯 最悪フレーム選定
 # =========================
@@ -97,7 +96,8 @@ score:数字 だけ返せ
         text = res.choices[0].message.content
 
         try:
-            score = int(text.split("score:")[1].strip())
+            match = re.search(r"\d+", text)  # 🔥 修正
+            score = int(match.group()) if match else 0
         except:
             score = 0
 
@@ -107,7 +107,7 @@ score:数字 だけ返せ
         return None, ""
 
     worst = max(scored, key=lambda x: x[0])
-    return worst[1], "最もミスが大きいシーン"
+    return worst[1], f"score:{worst[0]}"  # 🔥 修正
 
 # =========================
 # 🎯 画像生成
@@ -159,6 +159,8 @@ if "history" not in st.session_state:
     st.session_state.history = []
 if "frames" not in st.session_state:
     st.session_state.frames = []
+if "best_frame" not in st.session_state:  # 🔥 追加
+    st.session_state.best_frame = None
 
 video_file = st.file_uploader(
     "動画ファイルをアップロード",
@@ -190,7 +192,6 @@ st.session_state.event = event
 if st.button("🔥 着火　🔥", key="start_button"):
     st.write("DEBUG: ボタン押された")
 
-
     st.write("DEBUG:",
          "video_file:", video_file is not None,
          "start_time:", start_time,
@@ -201,12 +202,16 @@ if st.button("🔥 着火　🔥", key="start_button"):
         with open("input.mp4", "wb") as f:
             f.write(video_file.getvalue())
 
-        # 🔥 時間変換
-        start_sec = time_to_seconds(start_time)
-        end_sec = time_to_seconds(end_time)
-
+        # 🔥 時間チェック
+        if start_time and end_time:
+            start_sec = time_to_seconds(start_time)
+            end_sec = time_to_seconds(end_time)
+        else:
+            st.error("時間入力しろ")
+            st.stop()
 
         st.write("DEBUG start_sec:", start_sec, "end_sec:", end_sec)
+
         # 🔥 フレーム抽出
         frames = extract_frames(
             "input.mp4",
@@ -220,20 +225,47 @@ if st.button("🔥 着火　🔥", key="start_button"):
         if len(frames) > 0:
             best_frame = frames[0]
             st.session_state.best_frame = best_frame
-            if len(frames) > 0:
-                try:
-                    st.write("DEBUG: GPT解析開始")
 
-                    best_frame, vision_context = pick_worst_frame(frames, client)
+            try:
+                st.write("DEBUG: GPT解析開始")
 
-                    st.write("DEBUG: GPT解析成功")
-                    st.write("DEBUG vision:", vision_context[:100])
+                best_frame, vision_context = pick_worst_frame(frames, client)
 
-                    st.session_state.best_frame = best_frame
+                st.write("DEBUG: GPT解析成功")
+                st.write("DEBUG vision:", vision_context[:100])
 
-                except Exception as e:
-                    st.error(f"❌ GPTエラー: {e}")
-                    st.stop()
+                st.session_state.best_frame = best_frame
+
+                # =========================
+                # 🔥 GPT分析（追加）
+                # =========================
+                prompt = build_prompt(
+                    lane=lane,
+                    event=event,
+                    vision_context=vision_context
+                )
+
+                res = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}]
+                )
+
+                output_text = res.choices[0].message.content
+
+                outputs = [x.strip() for x in output_text.split("\n") if x.strip()][:3]
+
+                diagnosis = diagnose_player(outputs)
+
+                st.session_state.history.append({
+                    "outputs": outputs,
+                    "diagnosis": diagnosis
+                })
+
+                st.write("DEBUG: GPTコメント生成成功")
+
+            except Exception as e:
+                st.error(f"❌ GPTエラー: {e}")
+                st.stop()
 
 # =========================
 # 表示
@@ -258,6 +290,7 @@ if len(st.session_state.history) > 0:
         )
         with open(path,"rb") as f:
             st.download_button("DL", f, "lol.png")
+
     # =========================
     # 👇 Xシェア
     # =========================
